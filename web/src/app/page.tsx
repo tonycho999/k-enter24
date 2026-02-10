@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import HotKeywords from '@/components/HotKeywords';
 import GlobalReactions from '@/components/GlobalReactions';
 
-// 타입 정의
+// --- 타입 정의 ---
 type Article = {
   id: number;
   title: string;
@@ -12,10 +12,10 @@ type Article = {
   artist: string;
   date: string;
   image: string;
-  source: string; // 언론사 추가
+  source: string; // 언론사
 };
 
-// 더미 데이터 (이미지 포함)
+// --- 더미 데이터 (이미지 & 소스 포함) ---
 const MOCK_NEWS: Article[] = [
   {
     id: 1,
@@ -58,9 +58,9 @@ const MOCK_NEWS: Article[] = [
 export default function Home() {
   const [articles, setArticles] = useState<Article[]>(MOCK_NEWS);
   const [clickedCount, setClickedCount] = useState(0);
-  const [isSubscribed, setIsSubscribed] = useState(false); // 나중에 DB 연동
+  const [isSubscribed, setIsSubscribed] = useState(false); // DB 연동 예정
 
-  // 1. 로컬 스토리지에서 오늘 클릭 횟수 확인 (기존 로직 유지)
+  // 1. 로컬 스토리지에서 오늘 클릭 횟수 확인 및 초기화
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const today = new Date().toISOString().slice(0, 10);
@@ -70,6 +70,7 @@ export default function Home() {
       if (storedDate === today && storedCount) {
         setClickedCount(parseInt(storedCount));
       } else {
+        // 날짜가 바뀌었으면 리셋
         localStorage.setItem('lastClickDate', today);
         localStorage.setItem('clickCount', '0');
         setClickedCount(0);
@@ -77,28 +78,38 @@ export default function Home() {
     }
   }, []);
 
-  // 2. 카드 클릭 핸들러 (구독 제한 로직 유지)
+  // 2. 카드 클릭 핸들러 (구독 제한 로직)
   const handleCardClick = (id: number) => {
+    // 구독자가 아니고, 무료 횟수(1회)를 넘었을 때
     if (!isSubscribed && clickedCount >= 1) {
       alert("🔒 Free limit reached! Subscribe to read more K-POP news.");
       return;
     }
 
+    // 클릭 카운트 증가
     const newCount = clickedCount + 1;
     setClickedCount(newCount);
     localStorage.setItem('clickCount', newCount.toString());
     
     alert(`📢 Opening Article #${id} details...`);
+    // 추후 router.push(`/article/${id}`) 등으로 이동
   };
 
   return (
     <main className="min-h-screen bg-black text-white p-4 md:p-8 font-sans selection:bg-pink-500 selection:text-white">
       
-      {/* --- 헤더 영역 --- */}
+      {/* --- 1. 헤더 영역 (로고 적용) --- */}
       <header className="flex justify-between items-center mb-8 max-w-7xl mx-auto">
-        <h1 className="text-4xl font-extrabold tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-600 drop-shadow-[0_0_10px_rgba(34,211,238,0.5)]">
-          K-POP 24
-        </h1>
+        {/* 텍스트 대신 로고 이미지 사용 */}
+        <div className="flex items-center gap-2">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img 
+              src="/logo.png" 
+              alt="K-POP 24 Logo" 
+              className="h-14 md:h-16 w-auto object-contain drop-shadow-[0_0_15px_rgba(34,211,238,0.6)]" 
+            />
+        </div>
+
         <button 
           onClick={() => setIsSubscribed(!isSubscribed)} // 테스트용 토글
           className={`px-4 py-1.5 rounded-full text-sm font-bold transition-all shadow-[0_0_10px_rgba(34,211,238,0.2)] border 
@@ -111,11 +122,11 @@ export default function Home() {
         </button>
       </header>
 
-      {/* --- 상단 뉴스 섹션 (카드형) --- */}
+      {/* --- 2. 상단 뉴스 섹션 (카드형) --- */}
       <section className="mb-8 max-w-7xl mx-auto">
         <h2 className="text-xl font-bold mb-4 text-gray-200 flex items-center gap-2">
           Today&apos;s Top News 
-          {!isSubscribed && <span className="text-xs font-normal text-gray-500">(Free limit: {1 - clickedCount}/1)</span>}
+          {!isSubscribed && <span className="text-xs font-normal text-gray-500">(Free limit: {Math.max(0, 1 - clickedCount)}/1)</span>}
         </h2>
         
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -125,8 +136,8 @@ export default function Home() {
               onClick={() => handleCardClick(news.id)}
               className={`group relative h-72 rounded-xl overflow-hidden border transition-all duration-300 cursor-pointer
                 ${!isSubscribed && clickedCount >= 1 
-                  ? 'border-gray-800 opacity-70' // 잠김 상태 스타일
-                  : 'border-gray-800 hover:border-pink-500 hover:shadow-[0_0_15px_rgba(236,72,153,0.3)]' 
+                  ? 'border-gray-800 opacity-60' // 잠김 상태: 어둡게
+                  : 'border-gray-800 hover:border-pink-500 hover:shadow-[0_0_15px_rgba(236,72,153,0.3)]' // 활성 상태
                 }`}
             >
               {/* 배경 이미지 */}
@@ -155,9 +166,9 @@ export default function Home() {
                  </h3>
               </div>
 
-              {/* 잠금 오버레이 (무료 유저 클릭 소진 시) */}
+              {/* 잠금 오버레이 (무료 유저 클릭 소진 시 Hover 효과) */}
               {!isSubscribed && clickedCount >= 1 && (
-                <div className="absolute inset-0 bg-black/60 backdrop-blur-sm flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                <div className="absolute inset-0 bg-black/70 backdrop-blur-[2px] flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
                   <div className="text-3xl mb-2">🔒</div>
                   <span className="text-xs font-bold text-pink-500 border border-pink-500 px-3 py-1 rounded-full">
                     SUBSCRIBE TO UNLOCK
@@ -169,9 +180,9 @@ export default function Home() {
         </div>
       </section>
 
-      {/* --- 하단 데이터 섹션 (좌: 키워드 / 우: 글로벌 반응) --- */}
-      <section className="grid grid-cols-1 lg:grid-cols-2 gap-6 max-w-7xl mx-auto h-full">
-        {/* 기존 티커 대신 고정형 박스 적용 */}
+      {/* --- 3. 하단 데이터 섹션 (좌: 키워드 / 우: 글로벌 반응) --- */}
+      <section className="grid grid-cols-1 lg:grid-cols-2 gap-6 max-w-7xl mx-auto h-full pb-10">
+        {/* KeywordTicker 대신 새로운 그래프 컴포넌트 사용 */}
         <HotKeywords />
         <GlobalReactions />
       </section>
