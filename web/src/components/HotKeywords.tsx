@@ -1,11 +1,12 @@
 'use client';
 
+// 임시 데이터 (나중에 DB keywords 컬럼을 집계해서 props로 받아도 됨)
 const KEYWORDS = [
-  { rank: 1, text: "BTS Jin Comeback", percent: 85 },
-  { rank: 2, text: "NewJeans How Sweet", percent: 70 },
-  { rank: 3, text: "IVE World Tour", percent: 60 },
-  { rank: 4, text: "SEVENTEEN Maestro", percent: 50 },
-  { rank: 5, text: "AESPA Supernova", percent: 45 },
+  { rank: 1, text: "BTS Jin Solo", percent: 95 },
+  { rank: 2, text: "NewJeans Comeback", percent: 80 },
+  { rank: 3, text: "AESPA Drama", percent: 65 },
+  { rank: 4, text: "BlackPink Contract", percent: 50 },
+  { rank: 5, text: "SEVENTEEN Tour", percent: 40 },
 ];
 
 export default function HotKeywords() {
@@ -24,11 +25,10 @@ export default function HotKeywords() {
               </span>
               <span className="text-gray-500 text-xs">{item.percent}%</span>
             </div>
-            {/* 게이지 바 배경 */}
+            {/* 게이지 바 */}
             <div className="w-full bg-gray-800 rounded-full h-2.5 overflow-hidden">
-              {/* 실제 게이지 (그라데이션 효과) */}
               <div 
-                className="bg-gradient-to-r from-cyan-500 to-blue-500 h-2.5 rounded-full transition-all duration-1000 ease-out group-hover:from-pink-500 group-hover:to-purple-500" 
+                className="bg-gradient-to-r from-cyan-500 to-blue-500 h-2.5 rounded-full transition-all duration-1000 group-hover:from-pink-500 group-hover:to-purple-500" 
                 style={{ width: `${item.percent}%` }}
               ></div>
             </div>
