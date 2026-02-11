@@ -4,6 +4,7 @@
     "@supabase/ssr": "^0.8.0",
     "@supabase/supabase-js": "^2.95.3",
     "dotenv": "^17.2.4",
+    "framer-motion": "^12.34.0",
     "googleapis": "^171.4.0",
     "groq-sdk": "^0.37.0"
   }
