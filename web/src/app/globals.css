@@ -10,16 +10,14 @@
 
 body {
   color: rgb(var(--foreground-rgb));
-  background: linear-gradient(
-      to bottom,
-      transparent,
-      rgb(var(--background-end-rgb))
-    )
-    rgb(var(--background-start-rgb));
+  background: linear-gradient(to bottom, #0a0a1a, #000000);
   min-height: 100vh;
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden; /* 가로 스크롤 방지 */
 }
 
-/* 스크롤바 숨기기 (깔끔한 디자인용) */
+/* 스크롤바 숨기기 */
 .scrollbar-hide::-webkit-scrollbar {
     display: none;
 }
