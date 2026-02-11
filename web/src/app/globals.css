@@ -1,6 +1,4 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss"; /* 기존 @tailwind base, components, utilities를 대체합니다 */
 
 :root {
   --foreground-rgb: 255, 255, 255;
@@ -17,6 +15,7 @@ body {
   overflow-x: hidden;
 }
 
+/* 스크롤바 숨기기 */
 .scrollbar-hide::-webkit-scrollbar {
     display: none;
 }
