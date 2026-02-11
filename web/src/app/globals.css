@@ -14,10 +14,9 @@ body {
   min-height: 100vh;
   margin: 0;
   padding: 0;
-  overflow-x: hidden; /* 가로 스크롤 방지 */
+  overflow-x: hidden;
 }
 
-/* 스크롤바 숨기기 */
 .scrollbar-hide::-webkit-scrollbar {
     display: none;
 }
