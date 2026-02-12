@@ -5,16 +5,49 @@ import urllib.request
 import requests
 import re
 from bs4 import BeautifulSoup
+from datetime import datetime, timedelta
+from email.utils import parsedate_to_datetime # 네이버 날짜 파싱용
 
 def get_naver_api_news(keyword):
-    """네이버 API를 통해 뉴스 검색 (최대 100개)"""
-    url = f"https://openapi.naver.com/v1/search/news?query={urllib.parse.quote(keyword)}&display=100&sort=sim"
+    """
+    네이버 API 뉴스 검색
+    [수정] 
+    1. sort='date'로 변경하여 최신순 정렬
+    2. 24시간 지난 기사는 수집 단계에서 제외
+    3. pubDate 파싱하여 반환
+    """
+    # [수정] sort=sim(유사도) -> sort=date(날짜순) 변경
+    url = f"https://openapi.naver.com/v1/search/news?query={urllib.parse.quote(keyword)}&display=100&sort=date"
+    
     req = urllib.request.Request(url)
     req.add_header("X-Naver-Client-Id", os.environ.get("NAVER_CLIENT_ID"))
     req.add_header("X-Naver-Client-Secret", os.environ.get("NAVER_CLIENT_SECRET"))
+    
     try:
         res = urllib.request.urlopen(req)
-        return json.loads(res.read().decode('utf-8')).get('items', [])
+        items = json.loads(res.read().decode('utf-8')).get('items', [])
+        
+        valid_items = []
+        now = datetime.now()
+        threshold = now - timedelta(hours=24) # 24시간 제한선
+
+        for item in items:
+            try:
+                # 네이버 날짜 포맷 파싱 (Fri, 13 Feb 2026 14:00:00 +0900)
+                pub_date = parsedate_to_datetime(item['pubDate']).replace(tzinfo=None)
+                
+                # [필터링] 실제 작성 시간이 24시간 지났으면 제외
+                if pub_date < threshold:
+                    continue
+
+                # 통과한 기사는 파싱된 날짜 객체를 포함하여 리스트에 추가
+                item['published_at'] = pub_date
+                valid_items.append(item)
+            except:
+                continue
+
+        return valid_items
+
     except: return []
 
 def get_article_image(link):
