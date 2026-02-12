@@ -50,7 +50,9 @@ def run():
                     "score": art.get('score', 5.0), 
                     "likes": 0, 
                     "dislikes": 0, 
-                    "created_at": datetime.now().isoformat()
+                    "created_at": datetime.now().isoformat(),
+                    # [수정] 실제 기사 작성 시간 추가 (crawler에서 파싱해온 값)
+                    "published_at": orig.get('published_at', datetime.now()).isoformat()
                 })
             
             # DB 저장 (Repository에게 위임)
