@@ -5,14 +5,23 @@ import { supabase } from '@/lib/supabase';
 import { motion } from 'framer-motion';
 import { Newspaper, TrendingUp, Zap, Activity, Star } from 'lucide-react';
 
+// 1. 카테고리 정의 (화면에 보일 이름과 DB의 실제 값을 매칭)
+const CATEGORIES = [
+  { label: 'All', value: 'All' },
+  { label: 'K-POP', value: 'k-pop' },
+  { label: 'K-Drama', value: 'k-drama' },
+  { label: 'K-Movie', value: 'k-movie' },
+  { label: 'k-Entertain', value: 'k-entertain' }
+];
+
 export default function Home() {
-  // 여기서 에러 났던 부분을 any[]로 확실하게 고쳤습니다
   const [news, setNews] = useState<any[]>([]);
-  const [category, setCategory] = useState('All');
+  const [category, setCategory] = useState('All'); // 현재 선택된 버튼의 value 저장
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchNews = async () => {
+      setLoading(true);
       const { data } = await supabase
         .from('live_news')
         .select('*')
@@ -26,6 +35,7 @@ export default function Home() {
     fetchNews();
   }, []);
 
+  // 2. 필터링 로직: 선택된 카테고리 value와 DB의 category 필드를 비교
   const filteredNews = category === 'All' 
     ? news 
     : news.filter((item: any) => item.category === category);
@@ -40,7 +50,7 @@ export default function Home() {
 
       <div className="relative z-10 max-w-6xl mx-auto px-4 py-8">
         
-        {/* 헤더: 제목이 잘 보이도록 그라데이션 대신 흰색+네온 효과로 변경 */}
+        {/* 헤더 */}
         <header className="flex flex-col md:flex-row justify-between items-center mb-10 gap-4">
           <h1 className="text-5xl md:text-6xl font-extrabold tracking-tighter text-white drop-shadow-[0_0_15px_rgba(6,182,212,0.8)]">
             K-ENTER 24
@@ -58,7 +68,7 @@ export default function Home() {
             <div>
               <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">AI Chief Editor's Insight</h3>
               <p className="text-sm md:text-lg font-medium text-white">
-                "Global fans are currently hyped about <span className="text-cyan-400 font-bold">NewJeans</span> comeback rumors and <span className="text-purple-400 font-bold">Squid Game 2</span> teasers!"
+                "Global fans are currently hyped about <span className="text-cyan-400 font-bold">K-POP</span> debuts and <span className="text-purple-400 font-bold">K-Drama</span> casting news!"
               </p>
             </div>
           </div>
@@ -70,17 +80,18 @@ export default function Home() {
           {/* 왼쪽: 뉴스 피드 */}
           <div className="lg:col-span-8 space-y-6">
             <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide mb-4">
-              {['All', 'K-POP', 'K-Drama', 'K-Movie', 'k-Entertain'].map((tab) => (
+              {/* 3. 카테고리 버튼 렌더링 수정 */}
+              {CATEGORIES.map((tab) => (
                 <button
-                  key={tab}
-                  onClick={() => setCategory(tab)}
+                  key={tab.value}
+                  onClick={() => setCategory(tab.value)}
                   className={`px-5 py-2 rounded-full text-sm font-bold transition-all whitespace-nowrap border ${
-                    category === tab 
+                    category === tab.value 
                     ? 'bg-white text-black border-white shadow-[0_0_15px_rgba(255,255,255,0.4)]' 
                     : 'bg-white/5 text-gray-400 border-white/10 hover:bg-white/10 hover:text-white'
                   }`}
                 >
-                  {tab}
+                  {tab.label}
                 </button>
               ))}
             </div>
@@ -120,15 +131,18 @@ export default function Home() {
                     <div className="flex items-center justify-between mt-3 text-xs text-gray-500">
                       <div className="flex items-center gap-3">
                         <span className="flex items-center gap-1 text-yellow-500 font-bold">
-                          <Star className="w-3 h-3 fill-current" /> {item.score}
+                          <Star className="w-3 h-3 fill-current" /> {item.score || 9}
                         </span>
                         <span>{new Date(item.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
                       </div>
-                      <a href={item.link} target="_blank" className="text-cyan-500 hover:text-white font-bold">READ MORE →</a>
+                      <a href={item.link} target="_blank" rel="noopener noreferrer" className="text-cyan-500 hover:text-white font-bold">READ MORE →</a>
                     </div>
                   </div>
                 </motion.div>
               ))
+            )}
+            {!loading && filteredNews.length === 0 && (
+              <div className="text-center py-20 text-gray-600">No data found in this category.</div>
             )}
           </div>
 
