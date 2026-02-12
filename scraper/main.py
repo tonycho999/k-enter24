@@ -25,40 +25,19 @@ CATEGORY_MAP = {
     "k-culture": ["푸드", "뷰티", "웹툰", "팝업스토어", "패션", "음식", "해외반응"]
 }
 
-# [기존 유지] 불용어 리스트 (사용하지 않더라도 기존 코드 보존을 위해 남겨둠)
-STOPWORDS = {
-    "the", "a", "an", "and", "or", "but", "in", "on", "at", "to", "for", "of", "with", "by", 
-    "from", "up", "about", "into", "over", "after", "is", "are", "was", "were", "be", "been", 
-    "has", "have", "had", "it", "its", "they", "their", "this", "that", "these", "those", 
-    "new", "news", "official", "update", "korea", "korean", "top", "best", "hot", "reveals",
-    "releases", "drops", "teaser", "mv", "video", "photo", "poster", "trailer", "scene",
-    "netizens", "fans", "reaction", "review", "rank", "list", "vs", "kpop", "kdrama", "drama", "movie"
-}
-
-# [핵심 1] 미래지향적 AI 모델 자동 선택 함수 (Smart Sort)
+# [핵심 1] 미래지향적 AI 모델 자동 선택 함수
 def get_best_model():
-    """
-    Groq API에서 현재 사용 가능한 모델을 조회하고,
-    '최신 버전(숫자)' + '큰 파라미터(70b)' + '선호 패밀리(Llama)' 순으로 자동 정렬하여 반환.
-    나중에 Llama 4.0이 나와도 코드 수정 없이 자동으로 1순위가 됨.
-    """
     try:
-        # 1. Groq에서 현재 살아있는 모델 리스트 가져오기
         models_raw = groq_client.models.list()
         available_models = [m.id for m in models_raw.data]
         
-        # 2. 모델 필터링 및 점수 매기기 로직
         def model_scorer(model_id):
             score = 0
             model_id = model_id.lower()
-            
-            # (1) 선호하는 모델 가문 (Family)
             if "llama" in model_id: score += 1000
             elif "mixtral" in model_id: score += 500
             elif "gemma" in model_id: score += 100
             
-            # (2) 버전 숫자 추출 (예: llama-3.3 -> 3.3)
-            # 정규식으로 숫자.숫자 패턴을 찾아서 점수에 반영 (3.3 > 3.1)
             version_match = re.search(r'(\d+\.?\d*)', model_id)
             if version_match:
                 try:
@@ -66,28 +45,18 @@ def get_best_model():
                     score += version * 100 
                 except: pass
 
-            # (3) 파라미터 크기 (클수록 똑똑함)
             if "70b" in model_id: score += 50
             elif "8b" in model_id: score += 10
-            
-            # (4) Versatile 모델 선호 (범용성)
             if "versatile" in model_id: score += 5
-
             return score
 
-        # 3. 점수가 높은 순서대로 정렬
         available_models.sort(key=model_scorer, reverse=True)
-        
-        # 상위 3개 모델만 로그에 표시
         print(f"🤖 AI 모델 자동 선택 완료: {available_models[:3]}")
         return available_models
-
     except Exception as e:
         print(f"⚠️ 모델 리스트 조회 실패 (안전모드 진입): {e}")
-        # API가 죽었을 때를 대비한 최후의 안전장치 (하드코딩)
         return ["llama-3.3-70b-versatile", "mixtral-8x7b-32768"]
 
-# 전역 변수로 최적의 모델 리스트 로드
 MODELS_TO_TRY = get_best_model()
 
 def get_naver_api_news(keyword):
@@ -101,68 +70,60 @@ def get_naver_api_news(keyword):
         return json.loads(res.read().decode('utf-8')).get('items', [])
     except: return []
 
-# [핵심 2] 엉뚱한 사진 방지 로직 (본문 우선 + 필터링)
 def get_article_image(link):
-    headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-    }
+    headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'}
     try:
         res = requests.get(link, headers=headers, timeout=3)
         soup = BeautifulSoup(res.text, 'html.parser')
-        
         candidates = []
 
-        # 1. 본문 영역(div) 안의 이미지 최우선 추출
-        # 네이버 연예 뉴스는 보통 id="img1" 또는 id="dic_area" 내부에 본문이 있음
         main_content = soup.select_one('#dic_area, #articleBodyContents, .article_view, #articeBody, .news_view')
-        
         if main_content:
-            # 본문 내 이미지 태그 수집
             imgs = main_content.find_all('img')
             for i in imgs:
                 src = i.get('src') or i.get('data-src')
                 if src and 'http' in src:
-                    # width 속성이 있는데 200px 미만이면 아이콘일 확률 높음 -> 제외
                     width = i.get('width')
-                    if width and width.isdigit() and int(width) < 200:
-                        continue
+                    if width and width.isdigit() and int(width) < 200: continue
                     candidates.append(src)
 
-        # 2. 메타 태그 (og:image) - 본문 이미지를 못 찾았을 때 사용
         og = soup.find('meta', property='og:image')
-        if og and og.get('content'):
-            candidates.append(og['content'])
+        if og and og.get('content'): candidates.append(og['content'])
 
-        # 3. 필터링 및 최종 선택
         for img_url in candidates:
-            # URL에 특정 키워드가 포함되면 무조건 패스 (로고, 아이콘, 배너 등)
-            # Blackpink 기사에 'hot_click_bts.jpg' 같은 사이드바 배너가 걸리는 것을 방지
             bad_keywords = r'logo|icon|button|share|banner|thumb|profile|default|ranking|news_stand|ssl.pstatic.net'
-            if re.search(bad_keywords, img_url, re.IGNORECASE):
-                continue
-            
-            # 첫 번째로 발견된 '깨끗한' 이미지를 반환
+            if re.search(bad_keywords, img_url, re.IGNORECASE): continue
             return img_url
-
-        # 이미지가 없으면 None 반환 (나중에 placeholder 처리)
         return None
     except: return None
 
+# [핵심 수정] 요약 길이 대폭 확대 (30~50% 수준)
 def ai_category_editor(category, news_batch):
     if not news_batch: return []
     
-    # AI 입력 데이터 50개로 제한 (속도/비용 최적화)
+    # AI 입력 데이터 50개로 제한
     limited_batch = news_batch[:50]
-    raw_text = "\n".join([f"[{i}] {n['title']}" for i, n in enumerate(limited_batch)])
     
+    # [수정] 제목만 주는 게 아니라 '본문 요약(description)'도 함께 제공하여 정보량 확보
+    raw_text = ""
+    for i, n in enumerate(limited_batch):
+        # 네이버 API 특유의 태그(<b>, &quot;) 제거
+        clean_desc = n['description'].replace('<b>', '').replace('</b>', '').replace('&quot;', '"')
+        raw_text += f"[{i}] Title: {n['title']} / Context: {clean_desc}\n"
+    
+    # [수정] 프롬프트: '3-line summary' -> 'Detailed Narrative'로 변경
     prompt = f"""
     Task: Select exactly 30 news items for '{category}'. If fewer than 30, select ALL valid ones.
     
     Constraints: 
     1. Rank 1-30.
-    2. English title & 3-line English summary.
-    3. AI Score (0.0-10.0).
-    4. Return JSON format strictly.
+    2. English Title: Translate naturally.
+    3. English Summary: Write a DETAILED, rich narrative summary (approx. 5~8 sentences).
+       - Do NOT use bullet points. Write as a cohesive paragraph.
+       - Elaborate on the 'Context' provided to make the content substantial (30-50% length of a short article).
+       - Ensure specific details (Who, When, Where, Why) are included.
+    4. AI Score (0.0-10.0).
+    5. Return JSON format strictly.
 
     News List:
     {raw_text}
@@ -170,16 +131,15 @@ def ai_category_editor(category, news_batch):
     Output JSON Format:
     {{
         "articles": [
-            {{ "original_index": 0, "rank": 1, "category": "{category}", "eng_title": "...", "summary": "...", "score": 9.5 }}
+            {{ "original_index": 0, "rank": 1, "category": "{category}", "eng_title": "Detailed Title...", "summary": "Longer and richer summary text goes here...", "score": 9.5 }}
         ]
     }}
     """
     
-    # 동적으로 로드한 모델 리스트를 순서대로 시도
     for model in MODELS_TO_TRY:
         try:
             res = groq_client.chat.completions.create(
-                messages=[{"role": "system", "content": f"You are a K-Enter Editor for {category}."},
+                messages=[{"role": "system", "content": f"You are a professional K-Enter Journalist for {category}."},
                           {"role": "user", "content": prompt}], 
                 model=model, 
                 response_format={"type": "json_object"}
@@ -188,17 +148,14 @@ def ai_category_editor(category, news_batch):
             articles = data.get('articles', [])
             if articles: return articles
         except Exception as e:
-            # 429(Too Many Requests)나 400(Bad Request) 에러 발생 시 로그 찍고 다음 모델로 넘어감
             print(f"      ⚠️ {model} 실패 ({str(e)[:60]}...). 다음 모델 시도.")
             continue
     return []
 
-# [핵심 3] AI 기반 키워드 트렌드 분석 함수 (단어 세기 X -> AI 분석 O)
+# [핵심 3] AI 기반 키워드 트렌드 분석 함수
 def update_hot_keywords():
     print("📊 AI 키워드 트렌드 분석 시작...")
     
-    # 1. DB에서 최근 기사 제목 가져오기 (최신순 100개)
-    # 너무 옛날 기사까지 가져오면 트렌드가 희석되므로 최신 100개로 제한
     res = supabase.table("live_news").select("title").order("created_at", desc=True).limit(100).execute()
     titles = [item['title'] for item in res.data]
     
@@ -206,7 +163,6 @@ def update_hot_keywords():
         print("   ⚠️ 분석할 기사가 없습니다.")
         return
 
-    # 2. AI에게 보낼 프롬프트 작성
     titles_text = "\n".join([f"- {t}" for t in titles])
     
     prompt = f"""
@@ -230,7 +186,6 @@ def update_hot_keywords():
     }}
     """
 
-    # 3. AI 모델 호출 (가장 똑똑한 모델 사용)
     for model in MODELS_TO_TRY:
         try:
             res = groq_client.chat.completions.create(
@@ -240,16 +195,13 @@ def update_hot_keywords():
                 response_format={"type": "json_object"}
             )
             
-            # 결과 파싱
             result = json.loads(res.choices[0].message.content)
             keywords = result.get('keywords', [])
             
-            if not keywords:
-                continue
+            if not keywords: continue
 
             print(f"   🔥 AI가 추출한 진짜 트렌드: {[k['keyword'] for k in keywords[:5]]}...")
 
-            # 4. DB 업데이트
             supabase.table("trending_keywords").delete().neq("id", 0).execute()
             
             insert_data = []
@@ -264,23 +216,21 @@ def update_hot_keywords():
             if insert_data:
                 supabase.table("trending_keywords").insert(insert_data).execute()
                 print("   ✅ 키워드 랭킹 DB 업데이트 완료.")
-                return # 성공하면 종료
+                return 
 
         except Exception as e:
             print(f"      ⚠️ {model} 분석 실패: {e}")
             continue
 
 def run():
-    print("🚀 7단계 마스터 엔진 가동 (스마트 모델링 + 정밀 이미지 + 키워드 분석)...")
+    print("🚀 7단계 마스터 엔진 가동 (긴 요약 + 정밀 이미지 + 키워드 분석)...")
     
     for category, keywords in CATEGORY_MAP.items():
         print(f"📂 {category.upper()} 부문 처리 중...")
 
-        # 1. 수집
         raw_news = []
         for kw in keywords: raw_news.extend(get_naver_api_news(kw))
         
-        # 2. 중복 제거 (DB 비교)
         db_res = supabase.table("live_news").select("link").eq("category", category).execute()
         db_links = {item['link'] for item in db_res.data}
         new_candidate_news = [n for n in raw_news if n['link'] not in db_links]
@@ -288,7 +238,6 @@ def run():
         
         print(f"   🔎 수집: {len(raw_news)}개 -> 신규 후보: {len(new_candidate_news)}개")
 
-        # 3. AI 선별
         selected = ai_category_editor(category, new_candidate_news)
         num_new = len(selected)
         print(f"   ㄴ AI 선별 완료: {num_new}개")
@@ -301,7 +250,6 @@ def run():
                 
                 orig = new_candidate_news[idx]
                 
-                # [이미지 추출] 개선된 함수 사용
                 img = get_article_image(orig['link']) 
                 if not img: 
                     img = f"https://placehold.co/600x400/111/cyan?text={category}"
@@ -312,12 +260,10 @@ def run():
                     "score": art['score'], "likes": 0, "dislikes": 0, "created_at": datetime.now().isoformat()
                 })
             
-            # 7. 저장 (Upsert)
             if new_data_list:
                 supabase.table("live_news").upsert(new_data_list, on_conflict="link").execute()
                 print(f"   ✅ 신규 {len(new_data_list)}개 삽입 완료.")
 
-        # 4~6. 슬롯 체크 및 삭제 (30개 유지 로직)
         res = supabase.table("live_news").select("id", "created_at", "score").eq("category", category).execute()
         current_articles = res.data
         
@@ -339,14 +285,12 @@ def run():
             delete_ids = []
             current_count = len(current_articles)
             
-            # 오래된 것 삭제
             old_articles.sort(key=lambda x: x['created_at'])
             for oa in old_articles:
                 if current_count <= 30: break
                 delete_ids.append(oa['id'])
                 current_count -= 1
             
-            # 점수 낮은 것 삭제
             if current_count > 30:
                 fresh_articles.sort(key=lambda x: x['score'])
                 for fa in fresh_articles:
@@ -358,7 +302,6 @@ def run():
                 supabase.table("live_news").delete().in_("id", delete_ids).execute()
                 print(f"   🧹 슬롯 조정: {len(delete_ids)}개 삭제 완료.")
 
-    # [추가] 모든 뉴스 업데이트가 끝난 후 키워드 분석 실행
     update_hot_keywords()
     
     print(f"🎉 작업 완료.")
