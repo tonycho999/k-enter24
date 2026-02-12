@@ -25,8 +25,11 @@ CATEGORY_MAP = {
     "k-culture": ["푸드", "뷰티", "웹툰", "팝업스토어", "패션", "음식", "해외반응"]
 }
 
-# [기존 유지] AI 모델 자동 선택
+# [조건: AI 모델 동적 조회 및 최신순 정렬]
 def get_best_model():
+    """
+    Groq API에서 모델 리스트를 조회하여 최신 버전 -> 고성능 순으로 정렬
+    """
     try:
         models_raw = groq_client.models.list()
         available_models = [m.id for m in models_raw.data]
@@ -34,10 +37,13 @@ def get_best_model():
         def model_scorer(model_id):
             score = 0
             model_id = model_id.lower()
+            
+            # 1. 패밀리 점수
             if "llama" in model_id: score += 1000
             elif "mixtral" in model_id: score += 500
             elif "gemma" in model_id: score += 100
             
+            # 2. 버전 점수 (3.3 > 3.1)
             version_match = re.search(r'(\d+\.?\d*)', model_id)
             if version_match:
                 try:
@@ -45,22 +51,29 @@ def get_best_model():
                     score += version * 100 
                 except: pass
 
+            # 3. 파라미터 크기 점수 (70b > 8b)
             if "70b" in model_id: score += 50
             elif "8b" in model_id: score += 10
+            
+            # 4. 범용 모델 선호
             if "versatile" in model_id: score += 5
+            
             return score
 
+        # 점수기반 내림차순 정렬
         available_models.sort(key=model_scorer, reverse=True)
-        print(f"🤖 AI 모델 자동 선택 완료: {available_models[:3]}")
+        print(f"🤖 AI 모델 우선순위: {available_models[:3]}")
         return available_models
+
     except Exception as e:
-        print(f"⚠️ 모델 리스트 조회 실패 (안전모드 진입): {e}")
+        print(f"⚠️ 모델 조회 실패, 기본값 사용: {e}")
         return ["llama-3.3-70b-versatile", "mixtral-8x7b-32768"]
 
 MODELS_TO_TRY = get_best_model()
 
 def get_naver_api_news(keyword):
     import urllib.parse, urllib.request
+    # [조건 1] 최대한 많은 뉴스 가져오기 (display=100)
     url = f"https://openapi.naver.com/v1/search/news?query={urllib.parse.quote(keyword)}&display=100&sort=sim"
     req = urllib.request.Request(url)
     req.add_header("X-Naver-Client-Id", os.environ.get("NAVER_CLIENT_ID"))
@@ -97,28 +110,31 @@ def get_article_image(link):
         return None
     except: return None
 
-# [기존 유지] 상세 요약 프롬프트
+# [조건: 뉴스 요약 20~40%]
 def ai_category_editor(category, news_batch):
     if not news_batch: return []
+    
+    # 비용 절감을 위해 상위 50개만 AI에게 검토 요청
     limited_batch = news_batch[:50]
     
     raw_text = ""
     for i, n in enumerate(limited_batch):
+        # 네이버 API의 description(본문 요약)을 포함하여 정보량 확보
         clean_desc = n['description'].replace('<b>', '').replace('</b>', '').replace('&quot;', '"')
         raw_text += f"[{i}] Title: {n['title']} / Context: {clean_desc}\n"
     
     prompt = f"""
-    Task: Select exactly 30 news items for '{category}'. If fewer than 30, select ALL valid ones.
+    Task: Select highly relevant news items for '{category}'. 
+    Target Quantity: Try to select up to 30 items if they are relevant.
     
     Constraints: 
-    1. Rank 1-30.
-    2. English Title: Translate naturally.
-    3. English Summary: Write a DETAILED, rich narrative summary (approx. 5~8 sentences).
-       - Do NOT use bullet points. Write as a cohesive paragraph.
-       - Elaborate on the 'Context' provided to make the content substantial (30-50% length of a short article).
-       - Ensure specific details (Who, When, Where, Why) are included.
-    4. AI Score (0.0-10.0).
-    5. Return JSON format strictly.
+    1. English Title: Translate naturally.
+    2. English Summary: 
+       - Write a DETAILED narrative summary (approx. 20-40% length of a typical article).
+       - DO NOT use bullet points. Write 5-8 sentences in a cohesive paragraph.
+       - Include Who, When, Where, Why based on the context.
+    3. AI Score (0.0-10.0): Judge based on importance and trendiness.
+    4. Return JSON format strictly.
 
     News List:
     {raw_text}
@@ -126,7 +142,7 @@ def ai_category_editor(category, news_batch):
     Output JSON Format:
     {{
         "articles": [
-            {{ "original_index": 0, "rank": 1, "category": "{category}", "eng_title": "Detailed Title...", "summary": "Longer and richer summary text goes here...", "score": 9.5 }}
+            {{ "original_index": 0, "eng_title": "...", "summary": "Detailed summary...", "score": 8.5 }}
         ]
     }}
     """
@@ -134,7 +150,7 @@ def ai_category_editor(category, news_batch):
     for model in MODELS_TO_TRY:
         try:
             res = groq_client.chat.completions.create(
-                messages=[{"role": "system", "content": f"You are a professional K-Enter Journalist for {category}."},
+                messages=[{"role": "system", "content": f"You are a K-Enter Journalist for {category}."},
                           {"role": "user", "content": prompt}], 
                 model=model, 
                 response_format={"type": "json_object"}
@@ -143,35 +159,28 @@ def ai_category_editor(category, news_batch):
             articles = data.get('articles', [])
             if articles: return articles
         except Exception as e:
-            print(f"      ⚠️ {model} 실패 ({str(e)[:60]}...). 다음 모델 시도.")
+            print(f"      ⚠️ {model} 오류: {str(e)[:60]}... 다음 모델 시도.")
             continue
     return []
 
-# [기존 유지] AI 기반 키워드 트렌드 분석
+# [조건: 키워드는 절대 수정하지 말 것]
 def update_hot_keywords():
     print("📊 AI 키워드 트렌드 분석 시작...")
-    
     res = supabase.table("live_news").select("title").order("created_at", desc=True).limit(100).execute()
     titles = [item['title'] for item in res.data]
-    
     if not titles:
         print("   ⚠️ 분석할 기사가 없습니다.")
         return
-
     titles_text = "\n".join([f"- {t}" for t in titles])
-    
     prompt = f"""
     Analyze the following K-Entertainment news titles and identify the TOP 10 most trending keywords.
-    
     [Rules]
     1. Extract specific Entities: Person Name (e.g., "Lee Min-ho", NOT "Lee"), Group Name (e.g., "BTS"), Drama/Movie Title (e.g., "Squid Game").
     2. Merge related concepts: If "Jin" and "BTS" are both popular, use "BTS Jin".
     3. EXCLUDE generic words: Do NOT use words like "Variety", "Actor", "K-pop", "Review", "Netizens", "Update", "Official", "Comeback", "Teaser".
     4. Return JSON format with 'keyword' and estimated 'count' (importance score 1-100).
-
     [Titles]
     {titles_text}
-
     [Output Format JSON]
     {{
         "keywords": [
@@ -180,7 +189,6 @@ def update_hot_keywords():
         ]
     }}
     """
-
     for model in MODELS_TO_TRY:
         try:
             res = groq_client.chat.completions.create(
@@ -189,16 +197,11 @@ def update_hot_keywords():
                 model=model, 
                 response_format={"type": "json_object"}
             )
-            
             result = json.loads(res.choices[0].message.content)
             keywords = result.get('keywords', [])
-            
             if not keywords: continue
-
             print(f"   🔥 AI가 추출한 진짜 트렌드: {[k['keyword'] for k in keywords[:5]]}...")
-
             supabase.table("trending_keywords").delete().neq("id", 0).execute()
-            
             insert_data = []
             for item in keywords:
                 insert_data.append({
@@ -207,58 +210,58 @@ def update_hot_keywords():
                     "rank": item['rank'],
                     "updated_at": datetime.now().isoformat()
                 })
-            
             if insert_data:
                 supabase.table("trending_keywords").insert(insert_data).execute()
                 print("   ✅ 키워드 랭킹 DB 업데이트 완료.")
                 return 
-
         except Exception as e:
             print(f"      ⚠️ {model} 분석 실패: {e}")
             continue
 
 def run():
-    print("🚀 7단계 마스터 엔진 가동 (긴 요약 + 정밀 이미지 + 키워드 분석)...")
+    print("🚀 7단계 마스터 엔진 가동 (30개 사수 로직 + 동적 AI)...")
     
     for category, keywords in CATEGORY_MAP.items():
         print(f"📂 {category.upper()} 부문 처리 중...")
 
+        # 1. 수집 (최대한 많이)
         raw_news = []
         for kw in keywords: raw_news.extend(get_naver_api_news(kw))
         
+        # 2. 중복 제거 (DB와 비교)
+        # 이미 DB에 있는 링크는 제외하고 AI에게 보냄
         db_res = supabase.table("live_news").select("link").eq("category", category).execute()
-        db_links = {item['link'] for item in db_res.data}
-        new_candidate_news = [n for n in raw_news if n['link'] not in db_links]
-        new_candidate_news = list({n['link']: n for n in new_candidate_news}.values())
+        existing_links = {item['link'] for item in db_res.data}
         
-        print(f"   🔎 수집: {len(raw_news)}개 -> 신규 후보: {len(new_candidate_news)}개")
+        new_candidate_news = []
+        seen_links = set()
+        for n in raw_news:
+            if n['link'] not in existing_links and n['link'] not in seen_links:
+                new_candidate_news.append(n)
+                seen_links.add(n['link'])
+        
+        print(f"   🔎 수집: {len(raw_news)}개 -> 기존 DB 중복 제외: {len(new_candidate_news)}개")
 
+        # 3. AI 선별 및 요약 (새로운 뉴스만)
         selected = ai_category_editor(category, new_candidate_news)
-        num_new = len(selected)
-        print(f"   ㄴ AI 선별 완료: {num_new}개")
+        print(f"   ㄴ AI 선별 완료: {len(selected)}개")
 
-        if num_new > 0:
+        # 4. 신규 뉴스 저장
+        if selected:
             new_data_list = []
-            # [핵심 수정] enumerate를 사용하여 AI가 'rank'를 빼먹어도 강제로 1,2,3등 매김
             for i, art in enumerate(selected):
-                # 안전장치 1: original_index가 없으면 에러 나므로 체크
                 idx = art.get('original_index')
-                if idx is None: continue
-
-                if idx >= len(new_candidate_news): continue
+                if idx is None or idx >= len(new_candidate_news): continue
                 
                 orig = new_candidate_news[idx]
-                
-                img = get_article_image(orig['link']) 
-                if not img: 
-                    img = f"https://placehold.co/600x400/111/cyan?text={category}"
+                img = get_article_image(orig['link']) or f"https://placehold.co/600x400/111/cyan?text={category}"
 
-                # 안전장치 2: .get()으로 데이터 가져오고, 없으면 기본값 사용
                 new_data_list.append({
-                    "rank": art.get('rank', i + 1), # [수정] rank 없으면 루프 순서 사용
+                    # rank는 일단 임시값. 나중에 조회할 때 정렬함
+                    "rank": 99, 
                     "category": category, 
-                    "title": art.get('eng_title', orig['title']), # 영어 제목 없으면 원본
-                    "summary": art.get('summary', 'No summary provided.'), 
+                    "title": art.get('eng_title', orig['title']),
+                    "summary": art.get('summary', 'Detailed summary not available.'), 
                     "link": orig['link'], 
                     "image_url": img,
                     "score": art.get('score', 5.0), 
@@ -269,49 +272,70 @@ def run():
             
             if new_data_list:
                 supabase.table("live_news").upsert(new_data_list, on_conflict="link").execute()
-                print(f"   ✅ 신규 {len(new_data_list)}개 삽입 완료.")
+                print(f"   ✅ 신규 {len(new_data_list)}개 DB 저장 완료.")
 
-        res = supabase.table("live_news").select("id", "created_at", "score").eq("category", category).execute()
-        current_articles = res.data
+        # ==========================================================
+        # [조건 5 & 6] 스마트 삭제 로직 (무조건 30개 유지)
+        # ==========================================================
         
-        if len(current_articles) > 30:
+        # 1. 해당 카테고리의 모든 뉴스를 가져옴
+        res = supabase.table("live_news").select("id", "created_at", "score").eq("category", category).execute()
+        all_articles = res.data
+        total_count = len(all_articles)
+        
+        print(f"   📊 현재 DB 총 개수: {total_count}개 (목표: 30개 유지)")
+
+        if total_count > 30:
+            delete_ids = []
+            
+            # 전략 A: 24시간 지난 기사 삭제 (단, 30개 밑으로 떨어지면 중단)
             now = datetime.now()
             threshold = now - timedelta(hours=24)
             
-            old_articles = []
-            fresh_articles = []
-            for a in current_articles:
-                try:
-                    dt_obj = isoparse(a['created_at']).replace(tzinfo=None)
-                except:
-                    dt_obj = datetime(2000, 1, 1)
+            # 날짜순 정렬 (오래된 것부터)
+            try:
+                all_articles.sort(key=lambda x: isoparse(x['created_at']).replace(tzinfo=None))
+            except: pass # 날짜 파싱 에러나면 패스
 
-                if dt_obj < threshold: old_articles.append(a)
-                else: fresh_articles.append(a)
+            remaining_count = total_count
             
-            delete_ids = []
-            current_count = len(current_articles)
-            
-            old_articles.sort(key=lambda x: x['created_at'])
-            for oa in old_articles:
-                if current_count <= 30: break
-                delete_ids.append(oa['id'])
-                current_count -= 1
-            
-            if current_count > 30:
-                fresh_articles.sort(key=lambda x: x['score'])
-                for fa in fresh_articles:
-                    if current_count <= 30: break
-                    delete_ids.append(fa['id'])
-                    current_count -= 1
+            # 오래된 기사 찾아서 삭제 리스트에 추가
+            for art in all_articles:
+                try:
+                    art_date = isoparse(art['created_at']).replace(tzinfo=None)
+                except: art_date = datetime(2000, 1, 1)
+
+                if art_date < threshold:
+                    if remaining_count > 30: # [중요] 30개 될 때까지만 삭제
+                        delete_ids.append(art['id'])
+                        remaining_count -= 1
+                    else:
+                        break # 30개 도달하면 24시간 지났어도 삭제 멈춤!
+
+            # 전략 B: 24시간 지난거 다 지웠는데도 아직 30개가 넘으면? -> 점수 낮은 순 삭제
+            if remaining_count > 30:
+                # 삭제 대상이 아닌 남은 기사들만 추림
+                survivors = [a for a in all_articles if a['id'] not in delete_ids]
+                # 점수 낮은 순 정렬
+                survivors.sort(key=lambda x: x['score'])
+                
+                for art in survivors:
+                    if remaining_count > 30:
+                        delete_ids.append(art['id'])
+                        remaining_count -= 1
+                    else:
+                        break
 
             if delete_ids:
                 supabase.table("live_news").delete().in_("id", delete_ids).execute()
-                print(f"   🧹 슬롯 조정: {len(delete_ids)}개 삭제 완료.")
+                print(f"   🧹 공간 확보: {len(delete_ids)}개 삭제 완료 (현재 {remaining_count}개 유지).")
+        else:
+            print("   🛡️ 기사 개수가 30개 이하이므로 삭제하지 않습니다.")
 
+    # 키워드 분석 실행
     update_hot_keywords()
     
-    print(f"🎉 작업 완료.")
+    print(f"🎉 모든 작업 완료.")
 
 if __name__ == "__main__":
     run()
