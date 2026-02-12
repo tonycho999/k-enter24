@@ -25,7 +25,7 @@ CATEGORY_MAP = {
     "k-culture": ["푸드", "뷰티", "웹툰", "팝업스토어", "패션", "음식", "해외반응"]
 }
 
-# [핵심 1] 미래지향적 AI 모델 자동 선택 함수
+# [기존 유지] AI 모델 자동 선택
 def get_best_model():
     try:
         models_raw = groq_client.models.list()
@@ -97,21 +97,16 @@ def get_article_image(link):
         return None
     except: return None
 
-# [핵심 수정] 요약 길이 대폭 확대 (30~50% 수준)
+# [기존 유지] 상세 요약 프롬프트
 def ai_category_editor(category, news_batch):
     if not news_batch: return []
-    
-    # AI 입력 데이터 50개로 제한
     limited_batch = news_batch[:50]
     
-    # [수정] 제목만 주는 게 아니라 '본문 요약(description)'도 함께 제공하여 정보량 확보
     raw_text = ""
     for i, n in enumerate(limited_batch):
-        # 네이버 API 특유의 태그(<b>, &quot;) 제거
         clean_desc = n['description'].replace('<b>', '').replace('</b>', '').replace('&quot;', '"')
         raw_text += f"[{i}] Title: {n['title']} / Context: {clean_desc}\n"
     
-    # [수정] 프롬프트: '3-line summary' -> 'Detailed Narrative'로 변경
     prompt = f"""
     Task: Select exactly 30 news items for '{category}'. If fewer than 30, select ALL valid ones.
     
@@ -152,7 +147,7 @@ def ai_category_editor(category, news_batch):
             continue
     return []
 
-# [핵심 3] AI 기반 키워드 트렌드 분석 함수
+# [기존 유지] AI 기반 키워드 트렌드 분석
 def update_hot_keywords():
     print("📊 AI 키워드 트렌드 분석 시작...")
     
@@ -244,8 +239,12 @@ def run():
 
         if num_new > 0:
             new_data_list = []
-            for art in selected:
-                idx = art['original_index']
+            # [핵심 수정] enumerate를 사용하여 AI가 'rank'를 빼먹어도 강제로 1,2,3등 매김
+            for i, art in enumerate(selected):
+                # 안전장치 1: original_index가 없으면 에러 나므로 체크
+                idx = art.get('original_index')
+                if idx is None: continue
+
                 if idx >= len(new_candidate_news): continue
                 
                 orig = new_candidate_news[idx]
@@ -254,10 +253,18 @@ def run():
                 if not img: 
                     img = f"https://placehold.co/600x400/111/cyan?text={category}"
 
+                # 안전장치 2: .get()으로 데이터 가져오고, 없으면 기본값 사용
                 new_data_list.append({
-                    "rank": art['rank'], "category": category, "title": art['eng_title'],
-                    "summary": art['summary'], "link": orig['link'], "image_url": img,
-                    "score": art['score'], "likes": 0, "dislikes": 0, "created_at": datetime.now().isoformat()
+                    "rank": art.get('rank', i + 1), # [수정] rank 없으면 루프 순서 사용
+                    "category": category, 
+                    "title": art.get('eng_title', orig['title']), # 영어 제목 없으면 원본
+                    "summary": art.get('summary', 'No summary provided.'), 
+                    "link": orig['link'], 
+                    "image_url": img,
+                    "score": art.get('score', 5.0), 
+                    "likes": 0, 
+                    "dislikes": 0, 
+                    "created_at": datetime.now().isoformat()
                 })
             
             if new_data_list:
