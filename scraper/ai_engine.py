@@ -24,7 +24,7 @@ def get_best_model():
 
             if "70b" in model_id: score += 50
             elif "8b" in model_id: score += 10
-            if "versatile" in model_id: score += 5
+            if "versatile" in model_id: score += 3.5
             return score
 
         available_models.sort(key=model_scorer, reverse=True)
