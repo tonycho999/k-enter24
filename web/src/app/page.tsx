@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
-import { Lock, X, Zap } from 'lucide-react'; // 아이콘 추가
+import { Lock, Zap } from 'lucide-react';
 
 import Header from '@/components/Header';
 import CategoryNav from '@/components/CategoryNav';
@@ -18,7 +18,7 @@ export default function Home() {
   const [selectedArticle, setSelectedArticle] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [isTranslating, setIsTranslating] = useState(false);
-  const [user, setUser] = useState<any>(null); // 유저 상태
+  const [user, setUser] = useState<any>(null);
   
   // 웰컴 팝업 상태
   const [showWelcome, setShowWelcome] = useState(false);
@@ -31,7 +31,6 @@ export default function Home() {
     // 2. 웰컴 팝업 체크 (localStorage)
     const hasSeenWelcome = localStorage.getItem('hasSeenWelcome_v1');
     if (!hasSeenWelcome) {
-      // 1초 뒤에 팝업 띄움 (자연스럽게)
       setTimeout(() => setShowWelcome(true), 1000);
     }
 
@@ -86,7 +85,7 @@ export default function Home() {
   }, [news, isTranslating]);
 
   const handleVote = async (id: string, type: 'likes' | 'dislikes') => {
-    if (!user) return; // 비로그인 투표 방지
+    if (!user) return;
     await supabase.rpc('increment_vote', { row_id: id, col_name: type });
     setNews(prev => prev.map(item => item.id === id ? { ...item, [type]: item[type] + 1 } : item));
     if (selectedArticle?.id === id) {
@@ -94,13 +93,11 @@ export default function Home() {
     }
   };
 
-  // [핵심] 로그인 여부에 따른 데이터 필터링
   const getFilteredNews = () => {
     let baseNews = category === 'All' 
       ? [...news].sort((a, b) => (b.score || 0) - (a.score || 0))
       : news.filter(n => n.category === category).sort((a, b) => (a.rank || 99) - (b.rank || 99));
 
-    // 로그인 안 했으면 1개만 보여줌, 했으면 30개
     return user ? baseNews.slice(0, 30) : baseNews.slice(0, 1);
   };
 
@@ -109,6 +106,7 @@ export default function Home() {
   const handleLogin = async () => {
     await supabase.auth.signInWithOAuth({
       provider: 'google',
+      // [중요] location.origin 덕분에 현재 접속 도메인에 맞춰 자동으로 콜백 주소가 설정됨
       options: { redirectTo: `${location.origin}/auth/callback` },
     });
   };
@@ -127,13 +125,11 @@ export default function Home() {
             {/* [Paywall] 비로그인 유저용 잠금 화면 */}
             {!user && !loading && (
               <div className="mt-6 relative">
-                 {/* 가짜 블러 카드들 */}
                  <div className="space-y-6 opacity-40 blur-sm select-none pointer-events-none grayscale">
                     <div className="h-40 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200" />
                     <div className="h-40 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200" />
                  </div>
                  
-                 {/* 중앙 로그인 유도 */}
                  <div className="absolute inset-0 flex flex-col items-center justify-start pt-4">
                     <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl p-8 rounded-[32px] shadow-2xl border border-slate-100 dark:border-slate-800 text-center max-w-sm mx-auto">
                         <div className="w-14 h-14 bg-gradient-to-br from-cyan-400 to-blue-600 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg shadow-cyan-200">
@@ -166,12 +162,11 @@ export default function Home() {
       <ArticleModal article={selectedArticle} onClose={() => setSelectedArticle(null)} onVote={handleVote} />
       <MobileFloatingBtn />
 
- {/* [Welcome Popup] 신규 방문자용 팝업 (문구 수정됨) */}
+      {/* [Welcome Popup] 신규 방문자용 팝업 (문구 업데이트됨) */}
       {showWelcome && !user && (
         <div className="fixed inset-0 z-[999] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-300">
            <div className="bg-white dark:bg-slate-900 w-full max-w-md rounded-[32px] p-1 shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300">
               <div className="bg-gradient-to-br from-cyan-500 via-blue-600 to-indigo-600 p-8 rounded-[28px] text-center relative overflow-hidden">
-                 {/* 배경 장식 */}
                  <div className="absolute top-0 left-0 w-full h-full opacity-20 bg-[url('https://grainy-gradients.vercel.app/noise.svg')]"></div>
                  
                  <div className="relative z-10">
@@ -179,12 +174,10 @@ export default function Home() {
                        <Zap className="text-yellow-300 fill-yellow-300" size={24} />
                     </div>
                     
-                    {/* [수정] 헤드라인: 실시간성 강조 */}
                     <h2 className="text-2xl font-black text-white mb-3 tracking-tight leading-tight">
                        ⚡️ Real-time K-News Radar
                     </h2>
                     
-                    {/* [수정] 본문: 3줄 가량의 핵심 메시지 */}
                     <div className="text-white/95 font-medium text-sm mb-8 leading-relaxed space-y-2 opacity-90">
                        <p>Stop waiting for late translations.</p>
                        <p>Access breaking <span className="text-yellow-300 font-bold">K-Pop & Drama</span> articles the second they are published in Korea.</p>
@@ -200,7 +193,6 @@ export default function Home() {
                  </div>
               </div>
               
-              {/* 다시 보지 않기 체크박스 */}
               <div className="p-4 bg-white dark:bg-slate-900 text-center">
                  <label className="flex items-center justify-center gap-2 cursor-pointer group select-none">
                     <input 
