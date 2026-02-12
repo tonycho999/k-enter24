@@ -113,7 +113,7 @@ def run():
                 })
             
             if new_data_list:
-                supabase.table("live_news").insert(new_data_list).execute()
+                supabase.table("live_news").upsert(new_data_list, on_conflict="link").execute()
                 print(f"   ✅ 신규 {len(new_data_list)}개 삽입 완료.")
 
         # 4~6. 슬롯 체크 및 조건부 삭제
