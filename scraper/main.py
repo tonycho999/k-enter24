@@ -219,18 +219,15 @@ def update_hot_keywords():
             print(f"      ⚠️ {model} 분석 실패: {e}")
             continue
 
-# [신규 추가] 상위 랭크 기사 아카이빙 함수
+# [기존] 상위 랭크 기사 아카이빙
 def archive_top_articles():
     print("🗄️ 상위 랭크(Top 10) 기사 아카이빙 시작...")
     
     for category in CATEGORY_MAP.keys():
-        # 각 카테고리별로 rank가 1~10등인 기사만 가져옴 (score 높은 순도 가능)
         res = supabase.table("live_news").select("*").eq("category", category).order("rank", ascending=True).limit(10).execute()
         top_articles = res.data
         
         if top_articles:
-            # search_archive 테이블에 저장 (중복된 link가 있으면 업데이트)
-            # 주의: search_archive 테이블이 존재해야 함
             try:
                 supabase.table("search_archive").upsert(top_articles, on_conflict="link").execute()
                 print(f"   💾 {category.upper()}: Top {len(top_articles)}개 -> 아카이브 저장 완료.")
@@ -267,11 +264,21 @@ def run():
         # 4. 신규 뉴스 저장
         if selected:
             new_data_list = []
+            
+            # [핵심 수정] 이번 배안에서 링크 중복 체크용 Set
+            seen_batch_links = set()
+
             for i, art in enumerate(selected):
                 idx = art.get('original_index')
                 if idx is None or idx >= len(new_candidate_news): continue
                 
                 orig = new_candidate_news[idx]
+                
+                # [핵심 수정] 이미 이번 배치에 추가된 링크라면 건너뜀 (중복 에러 방지)
+                if orig['link'] in seen_batch_links:
+                    continue
+                seen_batch_links.add(orig['link'])
+
                 img = get_article_image(orig['link']) or f"https://placehold.co/600x400/111/cyan?text={category}"
 
                 new_data_list.append({
@@ -288,6 +295,7 @@ def run():
                 })
             
             if new_data_list:
+                # 이제 new_data_list 안에는 절대 중복된 link가 없음 -> 에러 해결
                 supabase.table("live_news").upsert(new_data_list, on_conflict="link").execute()
                 print(f"   ✅ 신규 {len(new_data_list)}개 DB 저장 완료.")
 
@@ -337,7 +345,7 @@ def run():
                 print(f"   🧹 공간 확보: {len(delete_ids)}개 삭제 완료 (현재 {remaining_count}개 유지).")
 
     # [마지막 단계] 아카이빙 및 키워드 분석
-    archive_top_articles() # [추가된 함수 호출]
+    archive_top_articles() 
     update_hot_keywords()
     
     print(f"🎉 모든 작업 완료.")
