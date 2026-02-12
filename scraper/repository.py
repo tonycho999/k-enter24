@@ -12,16 +12,13 @@ def save_news(news_list):
     뉴스 저장: 
     1. 중복 기사 제거 (링크 기준)
     2. 점수 4.0점 미만 제거
-    3. [NEW] 중복 이미지 제거 (시각적 다양성 확보)
+    3. 중복 이미지 제거 (시각적 다양성 확보)
     """
     if not news_list: return
     
     seen_links = set()
-    seen_images = set() # [추가] 이미 등록된 이미지 URL 추적용
+    seen_images = set() 
     unique_list = []
-    
-    # DB에 이미 저장된 이미지들도 확인하면 좋겠지만, 
-    # 성능을 위해 현재 수집된 배치를 기준으로 중복 이미지를 걸러냅니다.
     
     for item in news_list:
         # [규칙 1] 점수 4.0 미만은 저장 안 함
@@ -35,15 +32,12 @@ def save_news(news_list):
         if link in seen_links:
             continue
 
-        # [규칙 3] 이미지 중복 체크 (다양성 확보)
-        # 이미지가 없거나(빈 문자열), 플레이스홀더인 경우는 제외하고 체크
+        # [규칙 3] 이미지 중복 체크
         if img_url and "placehold.co" not in img_url:
             if img_url in seen_images:
-                # 이미 같은 사진을 쓰는 기사가 리스트에 있다면 이 기사는 건너뜀
                 continue
             seen_images.add(img_url)
 
-        # 통과된 기사 추가
         unique_list.append(item)
         seen_links.add(link)
             
@@ -60,10 +54,10 @@ def save_news(news_list):
 def manage_slots(category):
     """
     [슬롯 관리] 30개 유지 로직
-    - 30개가 넘으면 오래된 것(24시간+) 삭제
+    - [수정] '작성일(published_at)' 기준 24시간 지난 기사 우선 삭제
     - 그래도 넘으면 점수 낮은 순 삭제
-    - 남은 기사들의 랭킹(Rank) 업데이트 (참고용)
     """
+    # published_at 컬럼도 함께 가져오도록 select(*)
     res = supabase.table("live_news").select("*").eq("category", category).execute()
     all_articles = res.data
     total_count = len(all_articles)
@@ -79,19 +73,22 @@ def manage_slots(category):
     now = datetime.now()
     threshold = now - timedelta(hours=24) 
     
-    # 시간순 정렬
-    try: 
-        all_articles.sort(key=lambda x: isoparse(x['created_at']).replace(tzinfo=None))
-    except: pass
+    # 시간 도우미 함수: published_at이 있으면 쓰고, 없으면 created_at 사용
+    def get_news_time(item):
+        ts = item.get('published_at') or item.get('created_at')
+        try: return isoparse(ts).replace(tzinfo=None)
+        except: return datetime(2000, 1, 1)
+
+    # 작성일 순으로 정렬 (오래된 것부터 검사)
+    all_articles.sort(key=get_news_time)
 
     remaining_count = total_count
     
-    # 1. 24시간 지난 기사 우선 삭제
+    # 1. '작성일' 기준 24시간 지난 기사 우선 삭제
     for art in all_articles:
         if remaining_count <= 30: break
         
-        try: art_date = isoparse(art['created_at']).replace(tzinfo=None)
-        except: art_date = datetime(2000, 1, 1)
+        art_date = get_news_time(art)
 
         if art_date < threshold:
             delete_ids.append(art['id'])
@@ -135,12 +132,11 @@ def _update_rankings(articles):
 
 def archive_top_articles():
     """
-    [수정됨] 랭크 무시 -> 점수(Score) 7.0 이상인 기사 무조건 아카이빙
+    점수(Score) 7.0 이상인 기사 무조건 아카이빙
     """
     print("🗄️ 고득점(7.0+) 기사 아카이빙 체크...")
     
     try:
-        # 카테고리 구분 없이 7.0점 이상 조회
         res = supabase.table("live_news")\
             .select("*")\
             .gte("score", 7.0)\
@@ -157,12 +153,11 @@ def archive_top_articles():
                     "title": art['title'],
                     "summary": art['summary'],
                     "image_url": art['image_url'],
-                    "original_link": art['link'],  # live_news의 link -> search_archive의 original_link
+                    "original_link": art['link'], 
                     "score": art['score'],
-                    "rank": 0 # 랭크는 이제 의미 없으므로 0 처리
+                    "rank": 0 
                 })
             
-            # original_link 기준으로 upsert (중복 방지)
             supabase.table("search_archive").upsert(archive_data, on_conflict="original_link").execute()
             print(f"   💾 총 {len(archive_data)}개의 고득점 기사(7.0+) 아카이브 저장 완료.")
         else:
