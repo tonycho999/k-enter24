@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { createClient } from '@/utils/supabase/client';
+import { supabase } from '@/lib/supabase';
 
 export default function HotKeywords() {
   const [keywords, setKeywords] = useState<{ text: string; count: number }[]>([]);
