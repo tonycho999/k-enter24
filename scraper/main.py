@@ -5,7 +5,6 @@ import time
 import requests
 from supabase import create_client, Client
 from datetime import datetime, timedelta
-# [수정] 날짜 파싱 오류 해결을 위해 추가
 from dateutil.parser import isoparse 
 from dotenv import load_dotenv
 from groq import Groq
@@ -49,25 +48,44 @@ def get_article_image(link):
 
 def ai_category_editor(category, news_batch):
     if not news_batch: return []
-    limited_batch = news_batch[:150]
+    # AI가 분석할 수 있도록 후보군을 100개로 적절히 유지
+    limited_batch = news_batch[:100]
     raw_text = "\n".join([f"[{i}] {n['title']}" for i, n in enumerate(limited_batch)])
     
+    # [수정] 프롬프트 보강: AI에게 더 구체적인 편집 지침 하달
     prompt = f"""
-    Task: Select exactly 30 news items for '{category}'. If not enough, select as many as possible.
-    Constraints: Rank 1-30, English translation, 3-line summary, AI Score (0.0-10.0).
-    List: {raw_text}
-    Output JSON: {{ "articles": [ {{ "original_index": 0, "rank": 1, "category": "{category}", "eng_title": "...", "summary": "...", "score": 9.5 }} ] }}
+    Task: You are a professional news editor. Select the BEST 30 news items for the '{category}' category.
+    
+    Instructions:
+    1. Select as many as possible, UP TO 30 items. (Minimum 20 items is preferred).
+    2. Even if some news items seem less important, you MUST fill the quota to keep the news feed active.
+    3. Rank them 1-30.
+    4. Provide English title, a 3-line English summary, and AI Score (0.0-10.0).
+
+    News List:
+    {raw_text}
+
+    Output JSON Format:
+    {{
+        "articles": [
+            {{ "original_index": 0, "rank": 1, "category": "{category}", "eng_title": "...", "summary": "...", "score": 9.5 }}
+        ]
+    }}
     """
     
     for model in MODELS_TO_TRY:
         try:
             res = groq_client.chat.completions.create(
-                messages=[{"role": "system", "content": "You are a professional K-Enter Editor."},
+                messages=[{"role": "system", "content": f"You are a helpful assistant acting as a K-Enter Editor for {category}."},
                           {"role": "user", "content": prompt}], 
                 model=model, response_format={"type": "json_object"}
             )
-            return json.loads(res.choices[0].message.content).get('articles', [])
-        except: continue
+            data = json.loads(res.choices[0].message.content)
+            articles = data.get('articles', [])
+            if articles: return articles
+        except Exception as e:
+            print(f"      ⚠️ {model} 오류 발생: {e}")
+            continue
     return []
 
 def run():
@@ -76,7 +94,6 @@ def run():
     for category, keywords in CATEGORY_MAP.items():
         print(f"📂 {category.upper()} 부문 처리 중...")
 
-        # 1~2. 수집 및 중복 제거
         raw_news = []
         for kw in keywords: raw_news.extend(get_naver_api_news(kw))
         
@@ -87,12 +104,12 @@ def run():
         
         print(f"   🔎 수집: {len(raw_news)}개 -> 신규 기사: {len(new_candidate_news)}개")
 
-        # 3. 분류 및 평점 (AI Scoring)
+        # [요청 사항 반영] AI 선별 로그 추가 및 함수 실행
         selected = ai_category_editor(category, new_candidate_news)
         num_new = len(selected)
-        
+        print(f"   ㄴ AI 선별 완료: {num_new}개") # 선별된 개수 출력
+
         if num_new > 0:
-            # 7. 신규 기사 삽입 (Upsert로 중복 에러 방지)
             new_data_list = []
             for art in selected:
                 idx = art['original_index']
@@ -110,7 +127,7 @@ def run():
                 supabase.table("live_news").upsert(new_data_list, on_conflict="link").execute()
                 print(f"   ✅ 신규 {len(new_data_list)}개 삽입 완료.")
 
-        # 4~6. 슬롯 체크 및 조건부 삭제 (최소 30개 보장)
+        # 슬롯 체크 및 조건부 삭제
         res = supabase.table("live_news").select("id", "created_at", "score").eq("category", category).execute()
         current_articles = res.data
         current_count = len(current_articles)
@@ -119,25 +136,20 @@ def run():
             now = datetime.now()
             threshold = now - timedelta(hours=24)
             
-            # [수정된 파싱 로직] isoparse를 사용하여 마이크로초 자릿수 문제 해결
             old_articles = []
             fresh_articles = []
             for a in current_articles:
-                # isoparse는 .79472 같은 5자리 마이크로초도 완벽하게 읽습니다.
                 dt_obj = isoparse(a['created_at']).replace(tzinfo=None)
                 if dt_obj < threshold: old_articles.append(a)
                 else: fresh_articles.append(a)
             
             delete_ids = []
-            
-            # 5. 24시간 넘은 기사 삭제 (30개 될 때까지만)
             old_articles.sort(key=lambda x: x['created_at'])
             for oa in old_articles:
                 if current_count <= 30: break
                 delete_ids.append(oa['id'])
                 current_count -= 1
             
-            # 6. 그래도 30개 넘으면 점수 낮은 순 삭제
             if current_count > 30:
                 fresh_articles.sort(key=lambda x: x['score'])
                 for fa in fresh_articles:
