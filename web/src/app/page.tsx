@@ -11,7 +11,7 @@ const CATEGORIES = [
   { label: 'K-POP', value: 'k-pop' },
   { label: 'K-Drama', value: 'k-drama' },
   { label: 'K-Movie', value: 'k-movie' },
-  { label: 'k-Entertain', value: 'k-entertain' }
+  { label: 'K-Entertain', value: 'k-entertain' }
 ];
 
 export default function Home() {
