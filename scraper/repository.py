@@ -38,6 +38,9 @@ def save_news(news_list):
                 continue
             seen_images.add(img_url)
 
+        # [수정] rank 필드 제거 (필요 없음)
+        if 'rank' in item: del item['rank']
+            
         unique_list.append(item)
         seen_links.add(link)
             
@@ -54,18 +57,18 @@ def save_news(news_list):
 def manage_slots(category):
     """
     [슬롯 관리] 30개 유지 로직
-    - [수정] '작성일(published_at)' 기준 24시간 지난 기사 우선 삭제
+    - '작성일(published_at)' 기준 24시간 지난 기사 우선 삭제
     - 그래도 넘으면 점수 낮은 순 삭제
+    - [수정] 랭킹(Rank) 업데이트 로직 제거
     """
-    # published_at 컬럼도 함께 가져오도록 select(*)
     res = supabase.table("live_news").select("*").eq("category", category).execute()
     all_articles = res.data
     total_count = len(all_articles)
     
     print(f"   📊 {category.upper()}: 현재 {total_count}개 (목표: 30개)")
 
+    # 30개 이하라면 삭제할 것도, 랭킹 매길 것도 없으므로 종료
     if total_count <= 30:
-        _update_rankings(all_articles)
         return
 
     # --- 삭제 로직 ---
@@ -73,13 +76,11 @@ def manage_slots(category):
     now = datetime.now()
     threshold = now - timedelta(hours=24) 
     
-    # 시간 도우미 함수: published_at이 있으면 쓰고, 없으면 created_at 사용
     def get_news_time(item):
         ts = item.get('published_at') or item.get('created_at')
         try: return isoparse(ts).replace(tzinfo=None)
         except: return datetime(2000, 1, 1)
 
-    # 작성일 순으로 정렬 (오래된 것부터 검사)
     all_articles.sort(key=get_news_time)
 
     remaining_count = total_count
@@ -97,7 +98,7 @@ def manage_slots(category):
     # 2. 그래도 많으면 점수 낮은 순 삭제
     if remaining_count > 30:
         survivors = [a for a in all_articles if a['id'] not in delete_ids]
-        survivors.sort(key=lambda x: x.get('score', 0)) # 오름차순 (낮은 점수 먼저)
+        survivors.sort(key=lambda x: x.get('score', 0)) 
         
         for art in survivors:
             if remaining_count <= 30: break
@@ -108,31 +109,14 @@ def manage_slots(category):
         supabase.table("live_news").delete().in_("id", delete_ids).execute()
         print(f"   🧹 공간 확보: {len(delete_ids)}개 삭제 완료.")
     
-    # 남은 기사 랭킹 재정렬
-    final_survivors = [a for a in all_articles if a['id'] not in delete_ids]
-    _update_rankings(final_survivors)
+    # [수정] 랭킹 업데이트(_update_rankings) 호출 제거
 
-def _update_rankings(articles):
-    """남은 기사 점수순 정렬 후 Rank 업데이트"""
-    if not articles: return
-
-    # 점수 높은 순 정렬
-    articles.sort(key=lambda x: x.get('score', 0), reverse=True)
-    
-    updates = []
-    for i, art in enumerate(articles):
-        new_rank = i + 1
-        if art.get('rank') != new_rank:
-            updates.append({"id": art['id'], "rank": new_rank})
-            
-    if updates:
-        try:
-            supabase.table("live_news").upsert(updates).execute()
-        except: pass
+# _update_rankings 함수 삭제됨
 
 def archive_top_articles():
     """
     점수(Score) 7.0 이상인 기사 무조건 아카이빙
+    [수정] rank 관련 코드 완전히 제거
     """
     print("🗄️ 고득점(7.0+) 기사 아카이빙 체크...")
     
@@ -154,8 +138,8 @@ def archive_top_articles():
                     "summary": art['summary'],
                     "image_url": art['image_url'],
                     "original_link": art['link'], 
-                    "score": art['score'],
-                    "rank": 0 
+                    "score": art['score']
+                    # rank 필드 완전히 삭제됨
                 })
             
             supabase.table("search_archive").upsert(archive_data, on_conflict="original_link").execute()
@@ -177,7 +161,7 @@ def update_keywords_db(keywords):
         insert_data.append({
             "keyword": item.get('keyword'),
             "count": item.get('count', 0),
-            "rank": item.get('rank', i + 1),
+            "rank": item.get('rank', i + 1), # 키워드 랭킹은 유지 (1~10위)
             "updated_at": datetime.now().isoformat()
         })
     
