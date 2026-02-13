@@ -5,7 +5,7 @@ import requests
 from groq import Groq
 
 # =========================================================
-# 1. 모델 선택 로직
+# 1. 모델 선택 로직 (Guard 모델 제외 및 하드코딩 추가)
 # =========================================================
 
 def get_groq_text_models():
@@ -17,26 +17,42 @@ def get_groq_text_models():
         valid_models = []
         for m in all_models.data:
             mid = m.id.lower()
-            if 'vision' in mid or 'whisper' in mid or 'audio' in mid: continue
+            # [수정] guard, audio, vision, whisper 등 대화용 아닌거 다 뺌
+            if any(x in mid for x in ['vision', 'whisper', 'audio', 'guard', 'safe']): continue
             valid_models.append(m.id)
-        valid_models.sort(reverse=True)
+        # 8b, 70b 등 큰 모델 우선
+        valid_models.sort(key=lambda x: '70b' in x, reverse=True) 
         return valid_models
     except: return []
 
 def get_openrouter_text_models():
+    # [수정] API 호출 실패 대비해서, 확실한 무료/저가 모델 하드코딩 리스트 준비
+    fallback_models = [
+        "google/gemini-2.0-flash-lite-preview-02-05:free",
+        "google/gemini-2.0-flash-exp:free",
+        "mistralai/mistral-7b-instruct:free",
+        "meta-llama/llama-3-8b-instruct:free",
+        "microsoft/phi-3-medium-128k-instruct:free"
+    ]
+    
     try:
-        res = requests.get("https://openrouter.ai/api/v1/models", timeout=5)
-        if res.status_code != 200: return []
-        data = res.json().get('data', [])
-        valid_models = []
-        for m in data:
-            mid = m['id'].lower()
-            if ':free' in mid and ('chat' in mid or 'instruct' in mid or 'gpt' in mid):
-                if 'diffusion' in mid or 'image' in mid or 'vision' in mid or '3d' in mid: continue
-                valid_models.append(m['id'])
-        valid_models.sort(reverse=True)
-        return valid_models
-    except: return []
+        res = requests.get("https://openrouter.ai/api/v1/models", timeout=3)
+        if res.status_code == 200:
+            data = res.json().get('data', [])
+            valid_models = []
+            for m in data:
+                mid = m['id'].lower()
+                # 무료이면서 채팅 가능한거
+                if ':free' in mid and not any(x in mid for x in ['vision', 'image', '3d', 'diffusion']):
+                    valid_models.append(m['id'])
+            
+            if valid_models:
+                return valid_models
+    except:
+        pass
+    
+    # API 실패시 하드코딩 리스트 반환 (무조건 실행되게)
+    return fallback_models
 
 # =========================================================
 # 2. AI 답변 정제기
@@ -56,19 +72,14 @@ def clean_ai_response(text):
 def ask_ai_master(system_prompt, user_input):
     raw_response = ""
     
-    # [디버깅] 키 확인
+    # 1. Groq 시도
     groq_key = os.getenv("GROQ_API_KEY")
-    if not groq_key:
-        print("   [DEBUG] ⚠️ GROQ_API_KEY가 없습니다.")
-    
-    # Groq 시도
     if groq_key:
         models = get_groq_text_models()
-        if not models: print("   [DEBUG] Groq 모델을 찾을 수 없습니다.")
-        
         client = Groq(api_key=groq_key)
         for model_id in models:
             try:
+                # print(f"   [DEBUG] Groq 시도: {model_id}")
                 completion = client.chat.completions.create(
                     model=model_id,
                     messages=[{"role": "system", "content": system_prompt}, {"role": "user", "content": user_input}],
@@ -77,37 +88,44 @@ def ask_ai_master(system_prompt, user_input):
                 raw_response = completion.choices[0].message.content.strip()
                 if raw_response: break
             except Exception as e:
-                print(f"   [DEBUG] Groq 에러 ({model_id}): {e}")
+                # Rate Limit(429)이면 그냥 조용히 다음 모델/오픈라우터로 넘어감
                 continue
 
-    # OpenRouter 시도
+    # 2. OpenRouter 시도 (Groq 실패 시 무조건 실행)
     if not raw_response:
         or_key = os.getenv("OPENROUTER_API_KEY")
-        if not or_key:
-            print("   [DEBUG] ⚠️ OPENROUTER_API_KEY가 없습니다.")
-        
         if or_key:
+            # print("   [DEBUG] 🔄 Groq 실패 -> OpenRouter 전환 시도")
             models = get_openrouter_text_models()
+            
             for model_id in models:
                 try:
+                    # print(f"   [DEBUG] OpenRouter 시도: {model_id}")
                     res = requests.post(
                         url="https://openrouter.ai/api/v1/chat/completions",
-                        headers={"Authorization": f"Bearer {or_key}"},
+                        headers={
+                            "Authorization": f"Bearer {or_key}",
+                            "Content-Type": "application/json",
+                            "HTTP-Referer": "https://k-enter-trend.com" 
+                        },
                         json={
                             "model": model_id,
                             "messages": [{"role": "system", "content": system_prompt}, {"role": "user", "content": user_input}],
                             "temperature": 0.3
                         },
-                        timeout=20
+                        timeout=30 # 타임아웃 넉넉하게
                     )
+                    
                     if res.status_code == 200:
                         raw_response = res.json()['choices'][0]['message']['content']
                         if raw_response: break
-                    else:
-                        print(f"   [DEBUG] OpenRouter 에러: {res.status_code} {res.text}")
+                    # else:
+                        # print(f"   [DEBUG] OpenRouter 응답 실패: {res.status_code}")
+                        
                 except Exception as e:
-                    print(f"   [DEBUG] OpenRouter 예외: {e}")
                     continue
+        else:
+            print("   [DEBUG] ⚠️ OPENROUTER_API_KEY가 없습니다.")
 
     return clean_ai_response(raw_response)
 
@@ -127,7 +145,7 @@ def parse_json_result(text):
     return []
 
 # =========================================================
-# 4. [2단계] 키워드 추출
+# 4. 키워드 추출
 # =========================================================
 
 def extract_top_entities(category, news_text_data):
@@ -148,24 +166,10 @@ def extract_top_entities(category, news_text_data):
     - Max 40 items.
     """
     
-    user_input = news_text_data[:15000]
-    
-    # [디버깅] AI 호출 직전
-    # print(f"   [DEBUG] AI에게 키워드 추출 요청 중... (입력 길이: {len(user_input)})")
-    
+    user_input = news_text_data[:12000] # 길이 제한 (토큰 절약)
     raw_result = ask_ai_master(system_prompt, user_input)
-    
-    # [디버깅] 결과 확인
-    if not raw_result:
-        print("   [DEBUG] ❌ AI 응답이 비어있습니다.")
-    # else:
-    #     print(f"   [DEBUG] AI 응답(앞부분): {raw_result[:100]}...")
-
     parsed = parse_json_result(raw_result)
     
-    if not parsed and raw_result:
-        print(f"   [DEBUG] ❌ JSON 파싱 실패. 원본: {raw_result[:200]}")
-
     if isinstance(parsed, list):
         seen = set()
         unique_list = []
@@ -178,7 +182,7 @@ def extract_top_entities(category, news_text_data):
     return []
 
 # =========================================================
-# 5. [4단계] AI 브리핑
+# 5. 브리핑
 # =========================================================
 
 def synthesize_briefing(keyword, news_contents):
@@ -191,7 +195,7 @@ def synthesize_briefing(keyword, news_contents):
     user_input = "\n\n".join(news_contents)[:6000] 
     result = ask_ai_master(system_prompt, user_input)
     
-    if "INVALID_DATA" in result or len(result) < 50:
+    if not result or "INVALID_DATA" in result or len(result) < 50:
         return None
         
     return result
