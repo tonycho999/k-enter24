@@ -52,7 +52,6 @@ export default function Home() {
     setLoading(false);
   };
 
-  // 웰컴 팝업 닫기
   const closeWelcome = () => {
     if (dontShowAgain) {
       localStorage.setItem('hasSeenWelcome_v1', 'true');
@@ -60,7 +59,6 @@ export default function Home() {
     setShowWelcome(false);
   };
 
-  // AI 번역 리스너
   useEffect(() => {
     const handleTranslate = async (e: any) => {
       const targetLang = e.detail;
@@ -103,11 +101,10 @@ export default function Home() {
 
   const filteredNews = getFilteredNews();
 
-const handleLogin = async () => {
+  const handleLogin = async () => {
     await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: { 
-        // [수정] location.origin 대신 실제 주소를 직접 입력해서 배포 환경으로 강제 이동시킵니다.
         redirectTo: 'https://k-enter24.com/auth/callback' 
       },
     });
@@ -115,16 +112,22 @@ const handleLogin = async () => {
 
   return (
     <main className="min-h-screen bg-[#f8fafc] text-slate-800 font-sans dark:bg-slate-950 dark:text-slate-200 transition-colors">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2"> {/* py-2 유지 */}
         <Header />
-        <CategoryNav active={category} setCategory={setCategory} />
-        <InsightBanner insight={filteredNews[0]?.insight} />
+        
+        {/* [간격 조정] Header와 CategoryNav 사이의 간격을 좁히기 위해 mt값 제거 혹은 최소화 */}
+        <div className="mt-1"> 
+          <CategoryNav active={category} setCategory={setCategory} />
+        </div>
+        
+        <div className="mt-4">
+            <InsightBanner insight={filteredNews[0]?.insight} />
+        </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mt-8">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mt-6"> {/* mt-8 -> mt-6로 약간 축소 */}
           <div className="col-span-1 md:col-span-3 relative">
             <NewsFeed news={filteredNews} loading={loading || isTranslating} onOpen={setSelectedArticle} />
             
-            {/* [Paywall] 비로그인 유저용 잠금 화면 */}
             {!user && !loading && (
               <div className="mt-6 relative">
                  <div className="space-y-6 opacity-40 blur-sm select-none pointer-events-none grayscale">
@@ -164,28 +167,23 @@ const handleLogin = async () => {
       <ArticleModal article={selectedArticle} onClose={() => setSelectedArticle(null)} onVote={handleVote} />
       <MobileFloatingBtn />
 
-      {/* [Welcome Popup] 신규 방문자용 팝업 (문구 업데이트됨) */}
       {showWelcome && !user && (
         <div className="fixed inset-0 z-[999] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-300">
            <div className="bg-white dark:bg-slate-900 w-full max-w-md rounded-[32px] p-1 shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300">
               <div className="bg-gradient-to-br from-cyan-500 via-blue-600 to-indigo-600 p-8 rounded-[28px] text-center relative overflow-hidden">
                  <div className="absolute top-0 left-0 w-full h-full opacity-20 bg-[url('https://grainy-gradients.vercel.app/noise.svg')]"></div>
-                 
                  <div className="relative z-10">
                     <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-white/20 backdrop-blur-md mb-4 border border-white/30 shadow-lg">
                        <Zap className="text-yellow-300 fill-yellow-300" size={24} />
                     </div>
-                    
                     <h2 className="text-2xl font-black text-white mb-3 tracking-tight leading-tight">
                        ⚡️ Real-time K-News Radar
                     </h2>
-                    
                     <div className="text-white/95 font-medium text-sm mb-8 leading-relaxed space-y-2 opacity-90">
                        <p>Stop waiting for late translations.</p>
                        <p>Access breaking <span className="text-yellow-300 font-bold">K-Pop & Drama</span> articles the second they are published in Korea.</p>
                        <p>Experience the world's fastest K-Trend source.</p>
                     </div>
-                    
                     <button 
                        onClick={closeWelcome}
                        className="w-full py-4 bg-white text-slate-900 font-black text-lg rounded-2xl hover:bg-slate-50 hover:scale-[1.02] transition-all shadow-xl"
@@ -194,7 +192,6 @@ const handleLogin = async () => {
                     </button>
                  </div>
               </div>
-              
               <div className="p-4 bg-white dark:bg-slate-900 text-center">
                  <label className="flex items-center justify-center gap-2 cursor-pointer group select-none">
                     <input 
