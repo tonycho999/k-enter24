@@ -103,11 +103,13 @@ export default function Home() {
 
   const filteredNews = getFilteredNews();
 
-  const handleLogin = async () => {
+const handleLogin = async () => {
     await supabase.auth.signInWithOAuth({
       provider: 'google',
-      // [중요] location.origin 덕분에 현재 접속 도메인에 맞춰 자동으로 콜백 주소가 설정됨
-      options: { redirectTo: `${location.origin}/auth/callback` },
+      options: { 
+        // [수정] location.origin 대신 실제 주소를 직접 입력해서 배포 환경으로 강제 이동시킵니다.
+        redirectTo: 'https://k-enter24.com/auth/callback' 
+      },
     });
   };
 
