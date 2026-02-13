@@ -126,7 +126,7 @@ export default function Home() {
           </div>
           
           <div className="mt-0"> 
-             <InsightBanner insight={filteredNews[0]?.summary || filteredNews[0]?.title} />
+             <InsightBanner insight={filteredNews.length > 0 ? filteredNews[0].summary : undefined} />
           </div>
           
           <div className="mt-2">
