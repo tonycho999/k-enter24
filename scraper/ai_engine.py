@@ -1,6 +1,7 @@
 import os
 import json
 from groq import Groq
+from scraper.config import CATEGORIES, EXCLUDE_KEYWORDS
 
 def get_groq_client():
     api_key = os.getenv("GROQ_API_KEY")
@@ -16,7 +17,7 @@ def get_latest_models(client):
     """
     try:
         all_models = client.models.list()
-        # 텍스트 생성용 모델만 필터링
+        # 텍스트 생성용 모델만 필터링 (Whisper, Vision 제외)
         text_models = [m.id for m in all_models.data if "whisper" not in m.id and "vision" not in m.id]
         
         # 최신 모델이 먼저 오도록 역순 정렬
@@ -25,6 +26,69 @@ def get_latest_models(client):
     except Exception as e:
         print(f"      ⚠️ 모델 목록 조회 실패: {e}")
         return ["llama-3.3-70b-versatile", "llama-3.1-70b-versatile"]
+
+def ai_filter_and_rank_keywords(raw_keywords):
+    """
+    [NEW] 구글 트렌드 키워드 필터링 & 분류 함수
+    - 입력: 구글 실시간 트렌드 키워드 리스트
+    - 출력: {"k-pop": ["키워드1"], "k-drama": ["키워드2"]...} 형태의 JSON
+    - 역할: 스포츠/정치 등 노이즈 제거 및 카테고리 매핑
+    """
+    client = get_groq_client()
+    if not client: return {}
+
+    # 1. 모델 동적 조회 (기존 로직 활용)
+    dynamic_models = get_latest_models(client)
+
+    # 2. 분류 프롬프트 작성
+    system_prompt = f"""
+    You are the Chief Editor of 'K-Enter24'.
+    
+    [TASK]
+    1. Filter the provided list of real-time search keywords.
+    2. Select ONLY keywords related to these categories:
+       {json.dumps(CATEGORIES, indent=2)}
+    3. EXCLUDE any keywords related to: {', '.join(EXCLUDE_KEYWORDS)} or Politics/General Sports/Economy.
+    4. For sports stars (e.g., Son Heung-min, Choi Ga-on), exclude them UNLESS they are appearing in an entertainment show. If unsure, exclude.
+    5. Optimize the keyword for news search (e.g., "NewJeans" -> "NewJeans Comeback").
+
+    [OUTPUT FORMAT]
+    Return a JSON object ONLY. Keys must be the category names (k-pop, k-drama, k-movie, k-entertain, k-culture).
+    Values must be lists of optimized keywords.
+    Example:
+    {{
+        "k-pop": ["NewJeans Comeback", "BTS Jin"],
+        "k-drama": ["Squid Game 2 Cast"],
+        ...
+    }}
+    """
+
+    # 3. 모델 순차 시도
+    for model_id in dynamic_models:
+        try:
+            completion = client.chat.completions.create(
+                model=model_id,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": json.dumps(raw_keywords, ensure_ascii=False)}
+                ],
+                temperature=0.1 # 분류는 정확해야 하므로 낮음
+            )
+            
+            result = completion.choices[0].message.content.strip()
+            
+            if "```json" in result:
+                result = result.split("```json")[1].split("```")[0]
+            elif "```" in result:
+                result = result.split("```")[1].split("```")[0]
+            
+            return json.loads(result)
+
+        except Exception as e:
+            continue
+    
+    print("      ❌ 키워드 필터링 실패 (모든 모델 에러)")
+    return {}
 
 def ai_category_editor(category, news_list):
     client = get_groq_client()
