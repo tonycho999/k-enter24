@@ -75,10 +75,15 @@ export default function Home() {
     if (selectedArticle?.id === id) setSelectedArticle((prev: any) => ({ ...prev, [type]: prev[type] + 1 }));
   };
 
+  // [수정] 대소문자 무시하고 비교하도록 변경
   const getFilteredNews = () => {
     let baseNews = category === 'All' 
       ? [...news].sort((a, b) => (b.score || 0) - (a.score || 0))
-      : news.filter(n => n.category === category).sort((a, b) => (a.rank || 99) - (b.rank || 99));
+      : news.filter(n => 
+          // DB값과 선택값을 모두 소문자로 바꿔서 비교 (K-POP == k-pop)
+          n.category?.toLowerCase() === category.toLowerCase()
+        ).sort((a, b) => (a.rank || 99) - (b.rank || 99));
+
     return user ? baseNews.slice(0, 30) : baseNews.slice(0, 1);
   };
 
