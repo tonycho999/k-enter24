@@ -8,10 +8,7 @@ load_dotenv()
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 
-# [수정] exit() 대신 함수 내부에서 처리하도록 구조 변경
-# (함수가 실행될 때 체크하고 안전하게 리턴함)
-
-# AI가 분석한 트렌드 데이터 (이 부분은 유지보수를 위해 길게 두었습니다)
+# [데이터] 추후 구글 트렌드 API가 연동되면 이 부분이 동적으로 교체됩니다.
 RANKING_DATA = [
     # K-Pop
     {"category": "K-Pop", "rank": 1, "title": "NewJeans 'How Sweet'", "sub_title": "Melon Top 100 #1", "link_url": "https://www.youtube.com/watch?v=Q3K0TOvTOno", "image_url": "https://i.ytimg.com/vi/Q3K0TOvTOno/maxresdefault.jpg"},
@@ -50,7 +47,7 @@ RANKING_DATA = [
 ]
 
 def update_rankings():
-    # [안전 장치] 환경변수가 없으면 에러 내지 말고 그냥 함수 종료 (뉴스 수집은 계속되게)
+    # [안전 장치] 환경변수 체크 (없으면 리턴)
     if not SUPABASE_URL or not SUPABASE_KEY:
         print("⚠️ Warning: .env 파일을 찾을 수 없어 순위 업데이트를 건너뜁니다.")
         return
@@ -60,20 +57,23 @@ def update_rankings():
         
         print("📊 Updating Trend Rankings...")
         
-        # 1. 기존 데이터 안전하게 삭제 (전체 삭제 후 재입력 방식)
+        # 1. 기존 데이터 삭제 (Clean up)
         try:
+            # id가 '0'이 아닌 모든 데이터 삭제 (전체 삭제)
             supabase.table("trending_rankings").delete().neq("id", "00000000-0000-0000-0000-000000000000").execute()
         except Exception as e:
-            print(f"Clean up warning: {e}")
+            print(f"ℹ️ Clean up info (First run?): {e}")
 
-        # 2. 새 데이터 삽입
-        for item in RANKING_DATA:
-            supabase.table("trending_rankings").insert(item).execute()
-            print(f"   + Inserted: {item['category']} - {item['title']}")
-        
-        print("✅ Ranking Update Complete!")
+        # 2. 새 데이터 일괄 삽입 (Bulk Insert)
+        # [수정] for문 대신 한 번에 insert하여 속도 향상 및 API 호출 절약
+        if RANKING_DATA:
+            data, count = supabase.table("trending_rankings").insert(RANKING_DATA).execute()
+            print(f"✅ Ranking Update Complete! ({len(RANKING_DATA)} items inserted)")
+        else:
+            print("ℹ️ No ranking data to insert.")
 
     except Exception as e:
+        # 에러가 나도 프로그램 전체가 멈추지 않도록 예외 처리
         print(f"❌ Ranking Update Error: {e}")
 
 if __name__ == "__main__":
