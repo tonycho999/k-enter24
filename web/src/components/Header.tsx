@@ -145,7 +145,6 @@ export default function Header() {
         </div>
 
         <div className="flex items-center gap-2 relative">
-          {/* [추가] 검색 버튼 */}
           <button 
             onClick={() => setIsSearchOpen(true)}
             className="p-2.5 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400 transition-colors"
@@ -194,12 +193,11 @@ export default function Header() {
         </div>
       </header>
 
-      {/* [추가] 검색 모달 (Overlay) */}
+      {/* 검색 모달 */}
       {isSearchOpen && (
         <div className="fixed inset-0 z-[9999] bg-black/60 backdrop-blur-sm flex items-start justify-center pt-20 px-4">
           <div className="w-full max-w-2xl bg-white dark:bg-slate-900 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[80vh]">
             
-            {/* 검색 입력창 */}
             <form onSubmit={handleSearch} className="flex items-center p-4 border-b border-slate-100 dark:border-slate-800">
               <Search className="text-slate-400 mr-3" size={24} />
               <input 
@@ -215,19 +213,20 @@ export default function Header() {
               </button>
             </form>
 
-            {/* 검색 결과 영역 */}
             <div className="overflow-y-auto p-4">
               {isSearching ? (
                 <div className="text-center py-10 text-slate-400">Searching...</div>
               ) : searchResults.length > 0 ? (
                 <div className="space-y-4">
                   {searchResults.map((item) => (
-                    <a 
+                    <div 
                       key={item.id} 
-                      href={item.link} 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      className="block p-4 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group"
+                      // [수정 핵심] 클릭 시 모달 오픈 이벤트 발생
+                      onClick={() => {
+                        setIsSearchOpen(false); // 검색창 닫기
+                        window.dispatchEvent(new CustomEvent('open-news-modal', { detail: item }));
+                      }}
+                      className="block p-4 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group cursor-pointer"
                     >
                       <div className="flex justify-between items-start">
                         <div>
@@ -243,7 +242,7 @@ export default function Header() {
                         </div>
                         <ExternalLink size={16} className="text-slate-300 group-hover:text-cyan-500 opacity-0 group-hover:opacity-100 transition-all" />
                       </div>
-                    </a>
+                    </div>
                   ))}
                 </div>
               ) : searchQuery && (
@@ -253,7 +252,6 @@ export default function Header() {
               )}
             </div>
 
-            {/* 모달 하단 */}
             <div className="p-3 bg-slate-50 dark:bg-slate-950/50 text-center text-xs text-slate-400 border-t border-slate-100 dark:border-slate-800">
               Press Enter to search
             </div>
