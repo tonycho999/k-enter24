@@ -36,17 +36,18 @@ def save_news(news_list):
     try:
         # 1. Live News 저장
         supabase.table("live_news").insert(news_list).execute()
-        print(f"   ✅ DB 저장: 신규 {len(news_list)}개 등록 완료.")
+        print(f"    ✅ DB 저장: 신규 {len(news_list)}개 등록 완료.")
 
         # 2. Archive 저장 (평점 7.0 이상)
         high_score_news = [n for n in news_list if n.get('score', 0) >= 7.0]
         if high_score_news:
             try:
+                # 중복 방지를 위해 link로 체크하거나 try-except로 넘김
+                # (Supabase RLS나 Unique 제약조건이 있다고 가정)
                 supabase.table("search_archive").insert(high_score_news).execute()
-                print(f"   🏆 Archive: 평점 7.0 이상 {len(high_score_news)}개 아카이브 저장.")
+                print(f"    🏆 Archive: 평점 7.0 이상 {len(high_score_news)}개 아카이브 저장.")
             except Exception as e:
-                # 아카이브 중복은 무시
-                pass
+                pass # 이미 있는 경우 등 무시
 
     except Exception as e:
         print(f"❌ DB 저장 오류: {e}")
@@ -67,7 +68,7 @@ def manage_slots(category):
         TARGET = 30 
 
         if total_count <= TARGET:
-            print(f"   ✨ 현재 {total_count}개. 삭제 로직 건너뜀.")
+            print(f"    ✨ 현재 {total_count}개. 삭제 로직 건너뜀.")
             return
 
         now = datetime.now()
@@ -84,7 +85,7 @@ def manage_slots(category):
         delete_ids = []
         current_count = total_count
 
-        # 24시간 지난 것 우선 삭제 (30개 유지 조건)
+        # 1단계: 24시간 지난 것 우선 삭제
         for item in over_24h:
             if current_count > TARGET:
                 delete_ids.append(item['id'])
@@ -92,11 +93,11 @@ def manage_slots(category):
             else:
                 break 
 
-        # [규칙 6] 그래도 30개 초과 시 -> 점수 낮은 순 삭제
+        # [규칙 6] 2단계: 그래도 30개 초과 시 -> 점수 낮은 순 삭제
         if current_count > TARGET:
-            # 삭제 예정이 아닌 남은 기사들
+            # 삭제 예정이 아닌 남은 기사들만 추림
             survivors = [i for i in all_items if i['id'] not in delete_ids]
-            # 점수 오름차순 정렬 (낮은 점수가 0번 인덱스)
+            # 점수 오름차순 정렬 (낮은 점수가 앞)
             survivors.sort(key=lambda x: x.get('score', 0))
 
             for item in survivors:
@@ -108,7 +109,7 @@ def manage_slots(category):
 
         if delete_ids:
             supabase.table("live_news").delete().in_("id", delete_ids).execute()
-            print(f"   🧹 슬롯 정리: {len(delete_ids)}개 삭제 (잔여 {current_count}개)")
+            print(f"    🧹 슬롯 정리: {len(delete_ids)}개 삭제 (최종 {current_count}개 유지)")
 
     except Exception as e:
         print(f"⚠️ 슬롯 관리 오류: {e}")
