@@ -1,10 +1,17 @@
+import sys
 import os
+
+# [핵심 수정] 현재 파일(main.py)의 부모의 부모 폴더(프로젝트 루트)를 경로에 추가
+# 이렇게 해야 'from scraper import ...' 가 작동합니다.
+sys.path.append(os.path.dirname(os.path.abspath(os.path.dirname(__file__))))
+
 import time
 from datetime import datetime
 from dotenv import load_dotenv
 
 # 사용자 모듈 임포트
-from config import CATEGORY_MAP
+# (이제 sys.path에 루트가 추가되었으므로 에러가 나지 않습니다)
+from scraper.config import CATEGORY_MAP
 from scraper import crawler, ai_engine, repository, update_rankings
 
 # 환경변수 로드
