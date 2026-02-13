@@ -1,12 +1,14 @@
 import sys
 import os
 
+# 현재 파일 위치 기준으로 상위 폴더를 path에 추가 (모듈 import 문제 방지)
 sys.path.append(os.path.dirname(os.path.abspath(os.path.dirname(__file__))))
 
 import time
 from datetime import datetime
 from dotenv import load_dotenv
 
+# 모듈 import
 from scraper.config import CATEGORY_MAP
 from scraper import crawler, ai_engine, repository, update_rankings
 
@@ -34,7 +36,7 @@ def run_scraper():
                     new_candidate_news.append(n)
                     seen_links.add(n['link'])
             
-            print(f"   🔎 수집: {len(raw_news)}개 -> 중복 제거 후: {len(new_candidate_news)}개")
+            print(f"    🔎 수집: {len(raw_news)}개 -> 중복 제거 후: {len(new_candidate_news)}개")
 
             if not new_candidate_news:
                 continue
@@ -43,9 +45,20 @@ def run_scraper():
             # 70개가 안 되면 있는 만큼만 보냄
             ai_input_news = new_candidate_news[:70]
 
-            # AI 선별 (점수 부여 및 요약)
+            # 🟢 [핵심 추가] AI 요약 품질을 위해 본문 크롤링 (1,500자 확보)
+            print(f"    🕷️ AI 분석을 위한 본문 크롤링 중 ({len(ai_input_news)}개)...")
+            for news_item in ai_input_news:
+                # crawler.py에 새로 만든 get_article_data 함수 호출
+                full_text, image_url = crawler.get_article_data(news_item['link'])
+                
+                # 본문(full_text)은 AI 요약용, 이미지(image_url)는 저장용
+                news_item['full_content'] = full_text  
+                news_item['crawled_image'] = image_url 
+
+            # AI 선별 (점수 부여 및 3단계 요약)
+            # 이제 ai_input_news 안에 'full_content'가 들어있으므로 AI가 이걸 씁니다.
             analyzed_list = ai_engine.ai_category_editor(category, ai_input_news)
-            print(f"   ㄴ AI 분석 완료: {len(analyzed_list)}개")
+            print(f"    ㄴ AI 분석 완료: {len(analyzed_list)}개")
 
             if analyzed_list:
                 # [규칙 3 후반] 점수 기반 상위 30개 선정
@@ -61,9 +74,12 @@ def run_scraper():
                     if idx is None or idx >= len(ai_input_news): continue
                     
                     orig = ai_input_news[idx]
-                    img = crawler.get_article_image(orig['link']) or f"https://placehold.co/600x400/111/cyan?text={category}"
+                    
+                    # 이미 위에서 긁어온 이미지가 있으면 쓰고, 없으면 placeholder 사용
+                    # (orig['crawled_image']는 위에서 크롤링한 결과)
+                    img = orig.get('crawled_image') or f"https://placehold.co/600x400/111/cyan?text={category}"
 
-                    # Rank 컬럼 제거됨
+                    # DB 저장용 객체 생성
                     news_item = {
                         "category": category, 
                         "title": art.get('eng_title', orig['title']),
@@ -78,7 +94,7 @@ def run_scraper():
                     }
                     new_data_list.append(news_item)
                 
-                # [규칙 4] DB 저장 (30개) + [아카이빙]
+                # [규칙 4] DB 저장 (30개) + [아카이빙 로직은 repository 내부에서 처리]
                 repository.save_news(new_data_list)
 
             # [규칙 5 & 6] 슬롯 관리 (전체 30개 유지, 시간/점수 삭제)
@@ -92,6 +108,7 @@ def run_scraper():
     try:
         print("\n📊 AI 키워드 트렌드 분석 시작...")
         titles = repository.get_recent_titles()
+        # ai_engine에 해당 함수가 있는지 확인 후 실행
         if titles and hasattr(ai_engine, 'ai_analyze_keywords'):
             keywords = ai_engine.ai_analyze_keywords(titles)
             if keywords:
@@ -105,7 +122,10 @@ def main():
     print("🚀 K-Enter AI News Bot Started...")
     
     # 순위 업데이트
-    update_rankings.update_rankings() 
+    try:
+        update_rankings.update_rankings() 
+    except Exception as e:
+        print(f"⚠️ 순위 업데이트 실패: {e}")
     
     # 뉴스 수집 시작
     run_scraper()
