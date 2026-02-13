@@ -35,7 +35,6 @@ def run_scraper():
             
             print(f"   🔎 수집: {len(raw_news)}개 -> 기존 DB 중복 제외: {len(new_candidate_news)}개")
 
-            # 기사가 없으면 다음 카테고리로
             if not new_candidate_news:
                 continue
 
@@ -67,47 +66,38 @@ def run_scraper():
                         "published_at": orig.get('published_at', datetime.now()).isoformat()
                     })
                 
-                # DB 저장 (Repository에게 위임)
                 repository.save_news(new_data_list)
 
-            # 5. 슬롯 관리 (30개 유지)
+            # 5. 슬롯 관리
             repository.manage_slots(category)
 
         except Exception as e:
             print(f"⚠️ Error processing category {category}: {e}")
             continue
 
-    # [마지막 단계] 아카이빙 및 키워드 분석 (선택 사항)
+    # 키워드 분석 (옵션)
     try:
         print("\n📊 AI 키워드 트렌드 분석 시작...")
         titles = repository.get_recent_titles()
-        if titles:
-            # ai_engine에 해당 함수가 구현되어 있다고 가정
-            if hasattr(ai_engine, 'ai_analyze_keywords'):
-                keywords = ai_engine.ai_analyze_keywords(titles)
-                if keywords:
-                    print(f"   🔥 AI 추출 트렌드: {[k.get('keyword') for k in keywords[:3]]}...")
-                    repository.update_keywords_db(keywords)
-            else:
-                print("   ℹ️ 키워드 분석 함수가 아직 구현되지 않았습니다. 패스합니다.")
+        if titles and hasattr(ai_engine, 'ai_analyze_keywords'):
+            keywords = ai_engine.ai_analyze_keywords(titles)
+            if keywords:
+                repository.update_keywords_db(keywords)
     except Exception as e:
-        print(f"⚠️ 키워드 분석 중 오류 (무시됨): {e}")
+        print(f"⚠️ 키워드 분석 오류: {e}")
     
     print("🎉 뉴스 데이터 처리 작업 완료.")
 
 def main():
     print("🚀 K-Enter AI News Bot Started...")
-    print(f"🕒 Time: {datetime.now()}")
     
-    # [1] 순위 데이터 업데이트 실행 (사이드바용)
-    # 안전장치가 되어 있으므로 try-except 없이 호출해도 됨
+    # [1] 순위 데이터 업데이트 (안전장치 적용됨)
     update_rankings.update_rankings() 
     
-    # [2] 뉴스 수집 및 AI 요약 로직 실행
+    # [2] 뉴스 수집 시작
     run_scraper()
     
-    print("✅ All Tasks Completed Successfully. Exiting.")
-    # GitHub Actions는 여기서 스크립트가 끝나면(Exit) 자동으로 '성공(Green)' 처리됩니다.
+    print("✅ All Tasks Completed.")
 
 if __name__ == "__main__":
     main()
