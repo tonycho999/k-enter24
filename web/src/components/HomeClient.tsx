@@ -12,7 +12,7 @@ import Sidebar from '@/components/Sidebar';
 import ArticleModal from '@/components/ArticleModal';
 import MobileFloatingBtn from '@/components/MobileFloatingBtn';
 import AdBanner from '@/components/AdBanner';
-import { LiveNewsItem } from '@/types'; // 타입이 없다면 any로 대체 가능
+import { LiveNewsItem } from '@/types';
 
 interface HomeClientProps {
   initialNews: LiveNewsItem[];
@@ -20,19 +20,17 @@ interface HomeClientProps {
 
 export default function HomeClient({ initialNews }: HomeClientProps) {
   
-  // ✅ [보안 필터] HTTP 링크 원천 차단 및 이미지 주소 업그레이드 함수
+  // ✅ [수정됨] 링크가 없어도(NULL) 통과시키도록 필터 제거
   const filterSecureNews = (items: LiveNewsItem[]) => {
     if (!items) return [];
-    return items
-      .filter(item => item.link && item.link.startsWith('https://')) // 링크가 https인 것만 통과
-      .map(item => ({
+    return items.map(item => ({
         ...item,
-        // 이미지 주소가 http면 https로 변환 (Mixed Content 에러 방지)
+        // 이미지 주소만 보안 처리 (http -> https)
         image_url: item.image_url ? item.image_url.replace('http://', 'https://') : null
       }));
   };
 
-  // 1. 상태 관리 (초기 데이터에도 보안 필터 적용)
+  // 1. 상태 관리
   const [news, setNews] = useState<LiveNewsItem[]>(filterSecureNews(initialNews));
   const [category, setCategory] = useState('All');
   const [selectedArticle, setSelectedArticle] = useState<LiveNewsItem | null>(null);
@@ -57,7 +55,7 @@ export default function HomeClient({ initialNews }: HomeClientProps) {
     return () => subscription.unsubscribe();
   }, []);
 
-  // 3. [핵심] 카테고리 변경 시 DB에서 데이터 새로 가져오기 (랭킹순)
+  // 3. 카테고리 변경 시 DB에서 데이터 새로 가져오기
   const handleCategoryChange = async (newCategory: string) => {
     setCategory(newCategory);
     setLoading(true);
@@ -66,7 +64,7 @@ export default function HomeClient({ initialNews }: HomeClientProps) {
       let query = supabase
         .from('live_news')
         .select('*')
-        .order('rank', { ascending: true }) // 1위부터 순서대로
+        .order('rank', { ascending: true }) 
         .limit(30);
 
       if (newCategory !== 'All') {
@@ -76,7 +74,7 @@ export default function HomeClient({ initialNews }: HomeClientProps) {
       const { data, error } = await query;
 
       if (!error && data) {
-        // 새로 가져온 데이터도 보안 필터링 후 상태 업데이트
+        // 새로 가져온 데이터도 필터 적용 (이제 링크 없어도 통과됨)
         setNews(filterSecureNews(data as LiveNewsItem[]));
       }
     } catch (error) {
@@ -86,7 +84,7 @@ export default function HomeClient({ initialNews }: HomeClientProps) {
     }
   };
 
-  // 4. 좋아요 핸들러 (수정된 DB 함수 연동)
+  // 4. 좋아요 핸들러
   const handleVote = async (id: string, type: 'likes' | 'dislikes') => {
     if (!user) {
       alert("Please sign in to vote!");
@@ -98,20 +96,18 @@ export default function HomeClient({ initialNews }: HomeClientProps) {
        return;
     }
 
-    // 낙관적 UI 업데이트
     setNews(prev => prev.map(item => item.id === id ? { ...item, likes: item.likes + 1 } : item));
     if (selectedArticle?.id === id) {
       setSelectedArticle((prev: any) => ({ ...prev, likes: prev.likes + 1 }));
     }
 
-    // 서버 요청 (row_id 파라미터 사용)
     await supabase.rpc('increment_vote', { row_id: id });
   };
 
-  // 5. 비로그인 유저용 데이터 제한 (1개만 표시)
+  // 5. 비로그인 유저용 데이터 제한
   const displayNews = user ? news : news.slice(0, 1);
 
-  // 6. 이벤트 리스너 (모달 등)
+  // 6. 이벤트 리스너
   useEffect(() => {
     const handleSearchModalOpen = (e: any) => {
       if (e.detail) setSelectedArticle(e.detail);
@@ -139,12 +135,10 @@ export default function HomeClient({ initialNews }: HomeClientProps) {
         
         <div className="flex flex-col gap-0">
           <div className="mb-1">
-             {/* 카테고리 클릭 시 DB 재조회 함수 연결 */}
              <CategoryNav active={category} setCategory={handleCategoryChange} />
           </div>
           
           <div className="mt-0"> 
-             {/* 1위 뉴스 요약 표시 */}
              <InsightBanner insight={news.length > 0 ? news[0].summary : undefined} />
           </div>
           
@@ -161,7 +155,6 @@ export default function HomeClient({ initialNews }: HomeClientProps) {
               onOpen={setSelectedArticle} 
             />
             
-            {/* 로그인 유도 블러 처리 */}
             {!user && !loading && news.length > 0 && (
               <div className="mt-6 relative">
                  <div className="space-y-6 opacity-40 blur-sm select-none pointer-events-none grayscale">
