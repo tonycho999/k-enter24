@@ -1,75 +1,60 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 
 export default function AuthCallback() {
   const router = useRouter();
-  const [errorMsg, setErrorMsg] = useState('');
+  const searchParams = useSearchParams();
+  const [status, setStatus] = useState('Processing login...');
 
   useEffect(() => {
-    // 1. URL에 에러가 포함되어 있는지 확인 (#error_description=...)
-    const hash = window.location.hash;
-    if (hash && hash.includes('error')) {
-      setErrorMsg('Login failed: ' + hash);
-      return;
-    }
-
-    // 2. 세션 교환 시도
     const handleAuth = async () => {
-      try {
-        const { data: { session }, error } = await supabase.auth.getSession();
-        
-        if (error) {
-          throw error;
+      // 1. URL에 'code'가 있는지 확인 (PKCE 방식 - 최신 Supabase 기본값)
+      const code = searchParams.get('code');
+      
+      if (code) {
+        setStatus('Verifying security code...');
+        // 코드를 이용해 세션 교환 요청
+        const { error } = await supabase.auth.exchangeCodeForSession(code);
+        if (!error) {
+          router.push('/'); // 성공 시 메인으로 이동
+          return;
         }
+      }
 
-        if (session) {
-          // 로그인 성공 -> 메인으로 이동
-          router.push('/');
-        } else {
-          // 세션이 없으면 잠시 대기 (Supabase가 처리 중일 수 있음)
-          // 하지만 너무 오래 걸리면 문제
-          supabase.auth.onAuthStateChange((event, session) => {
-            if (event === 'SIGNED_IN' || session) {
-               router.push('/');
-            }
-          });
-        }
-      } catch (err: any) {
-        console.error('Auth Error:', err);
-        setErrorMsg(err.message || 'Unknown authentication error');
+      // 2. URL에 'access_token'이 있는지 확인 (Implicit 방식 - 구형)
+      const hash = window.location.hash;
+      if (hash && hash.includes('access_token')) {
+        setStatus('Verifying token...');
+        // Supabase가 자동으로 해시를 감지하여 세션 설정함
+      }
+
+      // 3. 이미 세션이 잡혀있는지 최종 확인
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        router.push('/');
+      } else {
+        // 세션 변화 감지 리스너 등록
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+          if (event === 'SIGNED_IN' || session) {
+            router.push('/');
+          }
+        });
+        return () => subscription.unsubscribe();
       }
     };
 
     handleAuth();
-  }, [router]);
+  }, [router, searchParams]);
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-white dark:bg-slate-950 p-4">
-      {errorMsg ? (
-        // 에러 발생 시 빨간 화면 표시
-        <div className="max-w-md w-full bg-red-50 border border-red-200 rounded-xl p-6 text-center">
-          <h2 className="text-xl font-bold text-red-600 mb-2">Login Error 😢</h2>
-          <p className="text-sm text-red-500 break-words">{errorMsg}</p>
-          <button 
-            onClick={() => router.push('/')}
-            className="mt-4 px-4 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition"
-          >
-            Go Back Home
-          </button>
-        </div>
-      ) : (
-        // 정상 로딩 화면
-        <div className="flex flex-col items-center gap-4">
-          <div className="w-12 h-12 border-4 border-slate-200 border-t-cyan-500 rounded-full animate-spin"></div>
-          <div className="text-center">
-            <h2 className="text-xl font-bold text-slate-800 dark:text-white">Signing in...</h2>
-            <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Verifying your account</p>
-          </div>
-        </div>
-      )}
+    <div className="min-h-screen flex flex-col items-center justify-center bg-white dark:bg-slate-950">
+      <div className="flex flex-col items-center gap-4">
+        <div className="w-12 h-12 border-4 border-slate-200 border-t-cyan-500 rounded-full animate-spin"></div>
+        <p className="text-slate-500 font-bold text-sm animate-pulse">{status}</p>
+      </div>
     </div>
   );
 }
