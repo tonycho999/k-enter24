@@ -1,7 +1,8 @@
 'use client';
 
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, ExternalLink, ThumbsUp, ThumbsDown, Share2, Calendar } from 'lucide-react';
+// ExternalLink 제거됨
+import { X, ThumbsUp, ThumbsDown, Share2, Calendar } from 'lucide-react';
 
 interface ArticleModalProps {
   article: any;
@@ -12,10 +13,10 @@ interface ArticleModalProps {
 export default function ArticleModal({ article, onClose, onVote }: ArticleModalProps) {
   if (!article) return null;
 
-  // [추가] 모달 내부 공유 버튼 로직
+  // 모달 내부 공유 버튼 로직
   const handleShare = async () => {
     const title = article.title;
-    const url = article.link; // 또는 article.original_link
+    const url = article.link; 
     
     try {
       if (navigator.share) {
@@ -46,7 +47,7 @@ export default function ArticleModal({ article, onClose, onVote }: ArticleModalP
           initial={{ scale: 0.9, opacity: 0, y: 20 }}
           animate={{ scale: 1, opacity: 1, y: 0 }}
           exit={{ scale: 0.9, opacity: 0, y: 20 }}
-          onClick={(e) => e.stopPropagation()} // 모달 내부 클릭 시 닫힘 방지
+          onClick={(e) => e.stopPropagation()} 
           className="bg-white dark:bg-slate-900 w-full max-w-2xl max-h-[90vh] rounded-[32px] overflow-hidden shadow-2xl flex flex-col"
         >
           {/* Header Image */}
@@ -90,21 +91,13 @@ export default function ArticleModal({ article, onClose, onVote }: ArticleModalP
               </div>
               
               <div className="flex gap-3">
-                {/* [수정] 공유 버튼에 handleShare 연결 */}
                 <button 
                   onClick={handleShare}
                   className="flex items-center gap-2 px-4 py-2 bg-slate-100 dark:bg-slate-800 rounded-xl font-bold text-sm text-slate-600 dark:text-slate-300 hover:bg-cyan-50 dark:hover:bg-cyan-900/30 hover:text-cyan-600 transition-colors"
                 >
                   <Share2 size={16} /> Share
                 </button>
-                <a 
-                  href={article.link} 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-2 px-4 py-2 bg-slate-900 dark:bg-cyan-600 text-white rounded-xl font-bold text-sm hover:opacity-90 transition-opacity"
-                >
-                  Read Original <ExternalLink size={16} />
-                </a>
+                {/* [삭제됨] Read Original 버튼 삭제 완료 */}
               </div>
             </div>
 
