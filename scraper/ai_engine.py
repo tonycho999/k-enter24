@@ -31,42 +31,58 @@ def ai_category_editor(category, news_list):
     client = get_groq_client()
     if not client: return []
     
-    # 1. 사용 가능한 모델 동적 조회
+    # 1. 사용 가능한 모델 동적 조회 (수정 금지)
     dynamic_models = get_latest_models(client)
     
-    # 2. 프롬프트: 요약 길이(40~50%) 및 평점 기준 명시
+    # 2. 프롬프트: 요약 길이(40~50%) 및 3단계 구조화 요약 명시
     system_prompt = f"""
     You are an expert K-Content News Editor for '{category}'.
     
-    [TASK]
-    1. Analyze the provided news articles.
-    2. **Summary Requirement:** The summary length must be **40% to 50% of the original text length**. 
-       - Keep enough details to understand the full context.
-       - Do NOT make it too short.
-    3. **Scoring:** Assign a score (0.0 - 10.0) based on newsworthiness.
-       - Score >= 7.0: Major news (will be archived).
-       - Score >= 5.0: Standard news.
-       - Score < 5.0: Minor/Spam.
-    
+    [GOAL]
+    Provide a rich and informative summary of the provided text. 
+    The summary must be approximately 40-50% of the input text length to ensure depth.
+
+    [3-STAGE SUMMARY STRUCTURE]
+    Every summary MUST consist of these three parts:
+    1. **Context & Background**: Why did this happen? Provide historical context or previous situations.
+    2. **Core Development**: What happened? Detail the main facts (Who, When, What, How) using the provided rich data.
+    3. **Impact & Outlook**: What's next? Include industry impact, fan reactions, stock trends, or future schedules.
+
+    [SCORING CRITERIA]
+    - Score (0.0 - 10.0) based on newsworthiness.
+    - Score >= 7.0: Major breaking news or high-quality deep dives.
+    - Score < 5.0: Minor updates or spam.
+
     [OUTPUT FORMAT]
     Return a JSON array ONLY:
     [
         {{
             "original_index": (int) index,
-            "eng_title": "Translated Title",
-            "summary": "Detailed summary (40-50% length)",
+            "eng_title": "Attractive Translated Title",
+            "summary": "Full 3-stage summary (Background / Core / Impact)",
             "score": (float) 0.0-10.0
         }}
     ]
     """
 
-    # 3. 입력 데이터 준비 (토큰 절약 위해 본문 500자 제한)
-    input_data = [
-        {"index": i, "title": n['title'], "body": n.get('originallink', n['link'])[:500]} 
-        for i, n in enumerate(news_list)
-    ]
+    # 3. 입력 데이터 준비 (본문 1500자 제한)
+    # news_list의 각 아이템에 'full_content' 키가 있다고 가정합니다.
+    # 만약 'full_content'가 없다면 'link'를 대신 사용하지만, 
+    # 스크래퍼에서 본문을 채워주는 것이 중요합니다.
+    input_data = []
+    for i, n in enumerate(news_list):
+        body_text = n.get('full_content', '')
+        if not body_text:
+             # full_content가 없으면 링크라도 넣어서 뭐라도 하게 함 (예외처리)
+             body_text = n.get('originallink', n['link'])
+             
+        input_data.append({
+            "index": i, 
+            "title": n['title'], 
+            "body": body_text[:1500] # 1,500자까지 전달
+        })
 
-    # 4. 모델 순차 시도
+    # 4. 모델 순차 시도 (수정 금지)
     for model_id in dynamic_models:
         try:
             # print(f"      🤖 시도 중: {model_id}...")
