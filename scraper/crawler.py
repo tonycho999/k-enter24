@@ -9,7 +9,7 @@ from datetime import datetime, timedelta
 from email.utils import parsedate_to_datetime
 
 def get_naver_api_news(keyword):
-    """네이버 API 뉴스 검색 (타임아웃 설정 추가)"""
+    """네이버 API 뉴스 검색 (타임아웃 10초)"""
     url = f"https://openapi.naver.com/v1/search/news?query={urllib.parse.quote(keyword)}&display=100&sort=date"
     
     req = urllib.request.Request(url)
@@ -17,7 +17,6 @@ def get_naver_api_news(keyword):
     req.add_header("X-Naver-Client-Secret", os.environ.get("NAVER_CLIENT_SECRET"))
     
     try:
-        # [중요] timeout=10 추가: 10초 동안 응답 없으면 포기
         print(f"📡 네이버 API 호출 중: {keyword}...")
         res = urllib.request.urlopen(req, timeout=10) 
         items = json.loads(res.read().decode('utf-8')).get('items', [])
@@ -42,44 +41,66 @@ def get_naver_api_news(keyword):
         print(f"❌ 네이버 API 에러 ({keyword}): {e}")
         return []
 
-def get_article_image(link):
-    """기사 본문에서 이미지 추출 (로그 및 타임아웃 강화)"""
+def get_article_data(link):
+    """
+    [업그레이드] 기사 본문(1,500자) 및 이미지 통합 추출 함수
+    """
     headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'}
     
     try:
-        # [확인] requests.get 호출 시 timeout=5 설정 (5초)
-        # 어디서 멈추는지 확인하기 위해 프린트 추가
-        print(f"   🖼️ 이미지 추출 중: {link[:50]}...") 
+        # 타임아웃 5초 설정
         res = requests.get(link, headers=headers, timeout=5)
         
         if res.status_code != 200:
-            return None
+            return "", None
 
         soup = BeautifulSoup(res.text, 'html.parser')
-        candidates = []
+        
+        # --- 1. 본문 텍스트 추출 (재료 확보) ---
+        # 주요 뉴스 사이트들의 본문 영역 태그 모음
+        content_area = soup.select_one('#dic_area, #articleBodyContents, .article_view, #articeBody, .news_view, #newsct_article, .article-body')
+        
+        full_text = ""
+        if content_area:
+            # 불필요한 태그 제거 (스크립트, 스타일, 광고 버튼 등)
+            for s in content_area(['script', 'style', 'iframe', 'button', 'a', 'div.ad']):
+                s.decompose()
+            full_text = content_area.get_text(separator=' ', strip=True)
+            # [핵심] 요약 품질을 위해 최대 1,500자까지 확보
+            full_text = full_text[:1500]
+        else:
+            # 본문 태그를 못 찾았을 경우, body 전체에서 텍스트만이라도 긁어오기 시도 (최후의 수단)
+            full_text = soup.body.get_text(separator=' ', strip=True)[:1000] if soup.body else ""
 
-        # 1. 본문 영역 우선 탐색
-        main_content = soup.select_one('#dic_area, #articleBodyContents, .article_view, #articeBody, .news_view')
-        if main_content:
-            imgs = main_content.find_all('img')
+        # --- 2. 이미지 추출 ---
+        image_url = None
+        
+        # 본문 영역 안의 이미지를 1순위로 찾음
+        if content_area:
+            imgs = content_area.find_all('img')
             for i in imgs:
                 src = i.get('src') or i.get('data-src')
                 if src and 'http' in src:
+                    # 너무 작은 아이콘/배너 제외
                     width = i.get('width')
                     if width and width.isdigit() and int(width) < 200: continue
-                    candidates.append(src)
+                    image_url = src
+                    break
 
-        # 2. 메타 태그 탐색
-        og = soup.find('meta', property='og:image')
-        if og and og.get('content'): candidates.append(og['content'])
+        # 본문에 없으면 메타 태그(og:image) 확인
+        if not image_url:
+            og = soup.find('meta', property='og:image')
+            if og and og.get('content'): 
+                image_url = og['content']
 
-        # 3. 불량 이미지 필터링
-        for img_url in candidates:
+        # 불량 이미지 키워드 필터링
+        if image_url:
             bad_keywords = r'logo|icon|button|share|banner|thumb|profile|default|ranking|news_stand|ssl.pstatic.net'
-            if re.search(bad_keywords, img_url, re.IGNORECASE): continue
-            return img_url
-            
-        return None
+            if re.search(bad_keywords, image_url, re.IGNORECASE): 
+                image_url = None
+
+        return full_text, image_url
+
     except Exception as e:
-        print(f"   ⚠️ 이미지 추출 실패: {e}")
-        return None
+        print(f"    ⚠️ 크롤링 실패 ({link[:30]}...): {e}")
+        return "", None
