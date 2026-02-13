@@ -21,23 +21,27 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          # 👇 [수정 완료] 여기에 feedparser를 추가했습니다!
+          # 필요한 라이브러리들 설치
           pip install requests beautifulsoup4 supabase groq python-dotenv feedparser
 
       - name: Run Scraper
         env:
-          # 파이썬이 찾는 이름(왼쪽)으로 맞춰주어야 합니다!
-          # (GitHub Secrets 이름(오른쪽)은 그대로 두셔도 됩니다)
+          # 1. Supabase 설정
           SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
           
-          # AI 및 네이버 키
-          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          # 2. 뉴스 검색 (네이버)
           NAVER_CLIENT_ID: ${{ secrets.NAVER_CLIENT_ID }}
           NAVER_CLIENT_SECRET: ${{ secrets.NAVER_CLIENT_SECRET }}
           
-          # 혹시 Python 코드가 OPENAI_API_KEY를 쓴다면 아래 주석을 풀고 추가하세요
-          # OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          # 3. 메인 AI (Groq)
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          
+          # 4. [추가] 백업 AI 1 (OpenRouter)
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          
+          # 5. [추가] 백업 AI 2 (Hugging Face)
+          HF_API_TOKEN: ${{ secrets.HF_API_TOKEN }}
 
         # 메인 코드 실행
         run: python scraper/main.py
