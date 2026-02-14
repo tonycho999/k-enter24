@@ -22,7 +22,6 @@ except Exception as e:
 def is_keyword_used_recently(category, keyword, hours=4):
     """
     [도배 방지] 해당 카테고리에서 특정 키워드가 최근 N시간 내에 사용되었는지 확인
-    True = 이미 씀 (사용 불가) / False = 안 씀 (사용 가능)
     """
     if not supabase: return False
     
@@ -38,40 +37,58 @@ def is_keyword_used_recently(category, keyword, hours=4):
             .gte("created_at", time_limit)\
             .execute()
             
-        # 카운트가 0보다 크면 이미 쓴 것
         return res.count > 0
     except Exception as e:
         print(f"   ⚠️ DB Check Error: {e}")
         return False
 
 def save_news_to_live(data_list):
-    """[메인 전시용] live_news 테이블에 저장 (최신 30개 유지용)"""
+    """[메인 전시용] live_news 테이블에 저장"""
     if not supabase or not data_list: return
 
     try:
+        # upsert 사용 (기존 데이터 업데이트 또는 신규 삽입)
         supabase.table("live_news").upsert(data_list).execute()
-        print(f"   💾 [Live] Saved to 'live_news'.")
+        print(f"   💾 [Live] Saved {len(data_list)} items to 'live_news'.")
     except Exception as e:
         print(f"   ⚠️ DB Save Error (live_news): {e}")
 
 def save_news_to_archive(data_list):
-    """[영구 보관용] search_archive 테이블에 저장 (삭제 안 함)"""
+    """[영구 보관용] search_archive 테이블에 저장"""
     if not supabase or not data_list: return
 
     try:
-        # 아카이브는 upsert 대신 insert (히스토리 보존)
-        supabase.table("search_archive").insert(data_list).execute()
-        print(f"   📦 [Archive] Saved to 'search_archive'.")
+        # [중요 수정] ID 충돌 방지 로직
+        # live_news 저장 후 객체에 'id'가 생겼을 수 있으므로,
+        # 복사본을 만들어서 'id'를 제거하고 순수 데이터만 아카이브에 저장함
+        clean_data = []
+        for item in data_list:
+            new_item = item.copy() # 복사
+            if 'id' in new_item:
+                del new_item['id'] # live_news에서 생긴 ID 제거
+            clean_data.append(new_item)
+
+        # 아카이브에 저장
+        supabase.table("search_archive").insert(clean_data).execute()
+        print(f"   📦 [Archive] Saved {len(clean_data)} items to 'search_archive'.")
     except Exception as e:
         print(f"   ⚠️ DB Save Error (search_archive): {e}")
 
 def save_rankings_to_db(rank_list):
-    """[순위표] live_rankings 테이블에 저장"""
+    """[순위표] live_rankings 테이블에 저장 (기존 순위 삭제 후 갱신)"""
     if not supabase or not rank_list: return
 
     try:
-        supabase.table("live_rankings").upsert(rank_list).execute()
-        print(f"   🏆 Saved rankings.")
+        # 1. 해당 카테고리의 기존 랭킹 싹 지우기 (초기화)
+        # 리스트의 첫 번째 아이템에서 카테고리 추출
+        category = rank_list[0].get("category")
+        if category:
+            supabase.table("live_rankings").delete().eq("category", category).execute()
+
+        # 2. 새로운 랭킹 저장
+        supabase.table("live_rankings").insert(rank_list).execute()
+        print(f"   🏆 Updated rankings for {category}.")
+        
     except Exception as e:
         print(f"   ⚠️ DB Save Error (live_rankings): {e}")
 
