@@ -19,41 +19,59 @@ SUPABASE_URL = os.getenv("SUPABASE_URL") or os.environ.get("NEXT_PUBLIC_SUPABASE
 SUPABASE_KEY = os.getenv("SUPABASE_KEY") or os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or os.environ.get("NEXT_PUBLIC_SUPABASE_ANON_KEY")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 
+# [Supabase 클라이언트 초기화]
 supabase: Client = None
-if SUPABASE_URL and SUPABASE_KEY:
+if not SUPABASE_URL or not SUPABASE_KEY:
+    print("⚠️ Warning (config.py): Supabase 환경변수가 설정되지 않았습니다.")
+else:
     try:
         supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
     except Exception as e:
-        print(f"⚠️ Supabase 초기화 실패: {e}")
+        print(f"⚠️ Warning: Supabase 클라이언트 초기화 실패: {e}")
 
-# =========================================================
-# [2. 수집 및 분류 설정 상수]
-# =========================================================
-# 네이버 API 수집 개수를 최대치(100)로 설정하여 24시간 내 뉴스를 최대한 확보합니다.
-NAVER_DISPLAY_COUNT = 100
-TOP_RANK_LIMIT = 30  # 카테고리당 분석 대상 순위
+# [Groq 클라이언트 초기화]
+groq_client = None
+if GROQ_API_KEY:
+    try:
+        groq_client = Groq(api_key=GROQ_API_KEY)
+    except:
+        pass
 
+# [1. 씨앗 키워드 설정 (Seed Keywords)]
 CATEGORY_SEEDS = {
-    "k-pop": ["멜론 차트 순위", "빌보드 K-pop 차트", "인기가요 1위", "아이돌 신곡 반응"],
-    "k-drama": ["드라마 시청률 순위", "넷플릭스 한국 드라마 순위", "티빙 인기 드라마", "방영 예정 드라마"],
-    "k-movie": ["박스오피스 예매율", "한국 영화 관객수", "개봉 영화 평점"],
-    "k-entertain": ["예능 시청률 순위", "OTT 예능 트렌드", "유튜브 인기 예능", "미스트롯 미스터트롯"], # 예능 시드 보강
-    "k-culture": ["서울 핫플레이스", "한국 유행 음식", "성수동 팝업스토어", "K-패션 트렌드"]
+    "k-pop": ["멜론 차트 순위", "빌보드 K-pop 차트", "인기가요 1위", "K-pop 신곡 반응", "아이돌 뮤직비디오 조회수"],
+    "k-drama": ["드라마 시청률 순위", "넷플릭스 한국 드라마 순위", "티빙 드라마 인기", "화제성 드라마 순위", "방영 예정 드라마 기대작"],
+    "k-movie": ["박스오피스 예매율", "넷플릭스 영화 순위", "한국 영화 관객수", "개봉 영화 평점"],
+    "k-entertain": ["미스트롯", "미스터트롯", "예능 시청률 순위", "OTT 예능 트렌드", "유튜브 인기 예능", "화제성 예능 프로그램"],
+    "k-culture": ["서울 핫플레이스 웨이팅", "한국 유행 음식", "성수동 팝업스토어", "한국 패션 트렌드", "한국 여행 필수 코스"]
 }
 
+# [2. 설정 상수]
+NAVER_DISPLAY_COUNT = 100 # [추가] 하루 모든 뉴스를 위해 100개로 상향
+TOP_RANK_LIMIT = 30  # 카테고리당 30위까지 선정
+
 # =========================================================
-# [3. AI 모델 로직 (Groq)]
+# 1. 모델 선택 로직 (Groq 전용)
 # =========================================================
+
 def get_groq_text_models():
     api_key = os.getenv("GROQ_API_KEY")
     if not api_key: return []
     try:
         client = Groq(api_key=api_key)
         all_models = client.models.list()
-        valid_models = [m.id for m in all_models.data if not any(x in m.id.lower() for x in ['vision', 'whisper', 'audio', 'guard', 'safe'])]
+        valid_models = []
+        for m in all_models.data:
+            mid = m.id.lower()
+            if any(x in mid for x in ['vision', 'whisper', 'audio', 'guard', 'safe']): continue
+            valid_models.append(m.id)
         valid_models.sort(key=lambda x: '70b' in x, reverse=True) 
         return valid_models
     except: return []
+
+# =========================================================
+# 2. AI 답변 정제기 및 호출 마스터
+# =========================================================
 
 def clean_ai_response(text):
     if not text: return ""
@@ -68,81 +86,65 @@ def clean_ai_response(text):
 
 def ask_ai_master(system_prompt, user_input):
     groq_key = os.getenv("GROQ_API_KEY")
-    models = get_groq_text_models()
-    if not groq_key or not models: return ""
+    if not groq_key: return ""
     
+    models = get_groq_text_models()
     client = Groq(api_key=groq_key)
+    
     for model_id in models:
         try:
             completion = client.chat.completions.create(
                 model=model_id,
                 messages=[{"role": "system", "content": system_prompt}, {"role": "user", "content": user_input}],
-                temperature=0.2 # 분류 정확도를 위해 온도를 낮춤
+                temperature=0.2 # [조정] 분류 정확도를 위해 0.2로 소폭 낮춤
             )
             res = completion.choices[0].message.content.strip()
             if res: return clean_ai_response(res)
-        except: continue
+        except:
+            continue
     return ""
 
 def parse_json_result(text):
+    if not text: return []
     try: return json.loads(text)
-    except:
+    except: pass
+    try:
         match = re.search(r'(\[.*\]|\{.*\})', text, re.DOTALL)
-        if match:
-            try: return json.loads(match.group(0))
-            except: pass
+        if match: return json.loads(match.group(0))
+    except: pass
     return []
 
 # =========================================================
-# [4. 카테고리별 엄격 분류 (Mistrot 방지 로직 추가)]
+# 3. [핵심] 카테고리별 엄격 분류 (Strict Mode 강화)
 # =========================================================
+
 def extract_top_entities(category, news_text_data):
-    # 미스트롯과 같은 예능이 드라마로 분류되는 것을 막기 위한 강력한 배타적 규칙
     specific_rule = ""
+    # [수정] 드라마 섹션에서 미스트롯과 같은 예능을 더 강력하게 배제
     if category.lower() == 'k-drama':
         specific_rule = """
         [STRICT K-DRAMA MODE]
-        1. 'content' MUST be a Scripted Series (Drama) title only.
-        2. NEVER include Variety, Audition, or Survival shows (e.g., 'Mistrot', 'Singles Inferno', 'Transit Love').
-        3. These audition/variety shows belong to 'k-entertain', NOT drama.
-        """
-    elif category.lower() == 'k-entertain':
-        specific_rule = """
-        [STRICT K-ENTERTAIN MODE]
-        1. INCLUDE all Audition, Survival, Reality, and Talk shows (e.g., 'Mistrot', 'I Live Alone').
-        2. EXCLUDE scripted dramas or movies.
-        """
-    elif category.lower() == 'k-pop':
-        specific_rule = """
-        [STRICT K-POP MODE]
-        1. 'content' MUST be a Song, Album, or Idol Group name.
-        2. EXCLUDE all TV show or Drama titles.
+        1. 'content' MUST be a REAL Scripted Drama/Series Title.
+        2. NEVER include Audition programs, Survival shows, or Music competitions (e.g., 'Miss Trot', 'Mr. Trot', 'Singles Inferno').
+        3. If it has judges or voting, it is NOT a drama. These belong to 'k-entertain'.
         """
     elif category.lower() == 'k-movie':
-        specific_rule = """
-        [STRICT K-MOVIE MODE]
-        1. 'content' MUST be a theatrical film title only.
-        """
+        specific_rule = "[STRICT K-MOVIE MODE] 'content' MUST be a theatrical film title only. No TV shows."
+    elif category.lower() == 'k-pop':
+        specific_rule = "[STRICT K-POP MODE] 'content' MUST be a Song, Album, or Group name. No drama titles."
+    # [수정] Culture 섹션이 너무 텅 비지 않도록 유연성 확보
     elif category.lower() == 'k-culture':
         specific_rule = """
         [STRICT K-CULTURE MODE]
-        1. Focus on Lifestyle, Food, Places, and Social Trends.
-        2. EXCLUDE specific celebrities or entertainment titles.
+        1. Focus on Lifestyle, Food, Places, Festivals, and Fashion trends.
+        2. If it is a general cultural phenomenon in Korea, include it.
         """
 
     system_prompt = f"""
-    You are an expert K-Content Analyst. Your goal is to extract the most trending keywords for '{category}'.
-    
+    You are an expert K-Content Analyst for '{category}'. 
     {specific_rule}
-    
-    [CLASSIFICATION]
-    1. 'content': The official TITLE of the work (Drama, Song, Movie).
-    2. 'person': The name of the artist or actor.
-
-    [OUTPUT]
-    - Return a JSON LIST: [{"keyword": "English Title", "type": "content/person"}]
-    - Translate all Korean titles to English.
-    - If no relevant '{category}' items exist, return [].
+    [TASK] Extract keywords ONLY belonging to '{category}'.
+    [OUTPUT] JSON LIST: [{{"keyword": "English Title", "type": "content/person"}}]
     """
     
     user_input = news_text_data[:20000] 
@@ -162,18 +164,13 @@ def extract_top_entities(category, news_text_data):
     return []
 
 # =========================================================
-# [5. 뉴스 브리핑 생성]
+# 4. 브리핑 생성
 # =========================================================
+
 def synthesize_briefing(keyword, news_contents):
-    system_prompt = f"""
-    You are a Professional News Editor. 
-    Topic: {keyword}
-    [TASK] Write a 10-line news briefing in ENGLISH based on provided news.
-    [RULE] No preamble, no <think> tags. If contents are irrelevant, return "INVALID_DATA".
-    """
+    system_prompt = f"Professional News Editor. Topic: {keyword}. Write a 10-line news briefing in English."
     user_input = "\n\n".join(news_contents)[:40000] 
     result = ask_ai_master(system_prompt, user_input)
-    
     if not result or "INVALID_DATA" in result or len(result) < 50:
         return None
     return result
