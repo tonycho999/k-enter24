@@ -2,8 +2,8 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
-import { Lock, Zap } from 'lucide-react';
-import { User } from '@supabase/supabase-js'; // User 타입 임포트
+import { Lock, Zap, Globe, Menu, X } from 'lucide-react';
+import { User } from '@supabase/supabase-js';
 
 import Header from '@/components/Header';
 import CategoryNav from '@/components/CategoryNav';
@@ -24,12 +24,11 @@ interface HomeClientProps {
 
 export default function HomeClient({ initialNews }: HomeClientProps) {
   
-  // ✅ [보안 필터] 이미지 주소만 업그레이드 (링크 검사 제거)
+  // ✅ [보안 필터] 이미지 주소만 업그레이드 (http -> https)
   const filterSecureNews = useCallback((items: LiveNewsItem[]) => {
     if (!items) return [];
     return items.map(item => ({
         ...item,
-        // 이미지 주소가 http면 https로 변환
         image_url: item.image_url ? item.image_url.replace('http://', 'https://') : null
       }));
   }, []);
@@ -41,7 +40,7 @@ export default function HomeClient({ initialNews }: HomeClientProps) {
   
   const [loading, setLoading] = useState(false);
   const [isTranslating, setIsTranslating] = useState(false);
-  const [user, setUser] = useState<User | null>(null); // User 타입 적용
+  const [user, setUser] = useState<User | null>(null);
   
   const [showWelcome, setShowWelcome] = useState(false);
   const [dontShowAgain, setDontShowAgain] = useState(false);
@@ -56,7 +55,6 @@ export default function HomeClient({ initialNews }: HomeClientProps) {
     
     const hasSeenWelcome = localStorage.getItem(WELCOME_MODAL_KEY);
     if (!hasSeenWelcome) {
-        // setTimeout 타이머 클리어 처리를 위해 변수에 할당
         const timer = setTimeout(() => setShowWelcome(true), 1000);
         return () => clearTimeout(timer);
     }
@@ -67,26 +65,25 @@ export default function HomeClient({ initialNews }: HomeClientProps) {
     return () => subscription.unsubscribe();
   }, []);
 
-  // 3. [핵심 수정] 카테고리 변경 시 정렬 로직 분기 (All: 평점순, 나머지: 랭킹순)
+  // 3. [핵심 로직] 카테고리 변경 시 데이터 조회
   const handleCategoryChange = useCallback(async (newCategory: string) => {
     setCategory(newCategory);
     setLoading(true);
 
     try {
-      // 쿼리 시작
       let query = supabase.from('live_news').select('*');
 
       if (newCategory === 'All') {
-        // ✅ [수정] All 트렌드는 '평점(score)' 높은 순으로 정렬
+        // All: 평점(score) 높은 순 (트렌드)
         query = query.order('score', { ascending: false });
       } else {
-        // ✅ [유지] 개별 카테고리는 소문자로 변환하여 조회 + '랭킹(rank)' 순 정렬
+        // 개별 카테고리: DB에 저장된 대소문자 그대로 비교 (K-Entertain 등) + 랭킹순
         query = query
           .eq('category', newCategory)
           .order('rank', { ascending: true });
       }
 
-      // 공통: 30개 제한
+      // 30개 제한
       query = query.limit(30);
 
       const { data, error } = await query;
@@ -99,7 +96,7 @@ export default function HomeClient({ initialNews }: HomeClientProps) {
     } finally {
       setLoading(false);
     }
-  }, [filterSecureNews]); // filterSecureNews 의존성 추가
+  }, [filterSecureNews]);
 
   // 4. 좋아요 핸들러
   const handleVote = useCallback(async (id: string, type: 'likes' | 'dislikes') => {
@@ -113,9 +110,10 @@ export default function HomeClient({ initialNews }: HomeClientProps) {
        return;
     }
 
+    // UI 즉시 반영 (Optimistic Update)
     setNews(prev => prev.map(item => item.id === id ? { ...item, likes: item.likes + 1 } : item));
     
-    // selectedArticle 상태 업데이트 (현재 보고 있는 기사라면)
+    // 모달이 열려있다면 모달 내부 상태도 업데이트
     setSelectedArticle((prev) => {
         if (prev && prev.id === id) {
             return { ...prev, likes: prev.likes + 1 };
@@ -123,16 +121,13 @@ export default function HomeClient({ initialNews }: HomeClientProps) {
         return prev;
     });
 
+    // DB 업데이트
     await supabase.rpc('increment_vote', { row_id: id });
-  }, [user]); // user 의존성 추가
+  }, [user]);
 
-  // 5. 클라이언트 사이드 필터링 (All일 때는 전체 표시, 아니면 카테고리 소문자로 비교)
-  // useMemo를 사용하여 불필요한 연산 방지
-  // const displayNewsRaw = user ? news : news.slice(0, 1); // 기존 로직 (로그인 안하면 1개만 보임) -> 아래 렌더링 로직에서 처리됨
-  
-  // 6. 이벤트 리스너
+  // 5. 이벤트 리스너 (모달 열기 등)
   useEffect(() => {
-    const handleSearchModalOpen = (e: CustomEvent<LiveNewsItem>) => { // CustomEvent 타입 적용
+    const handleSearchModalOpen = (e: CustomEvent<LiveNewsItem>) => {
       if (e.detail) setSelectedArticle(e.detail);
     };
     window.addEventListener('open-news-modal', handleSearchModalOpen as EventListener);
@@ -151,17 +146,15 @@ export default function HomeClient({ initialNews }: HomeClientProps) {
     });
   };
 
-  // 렌더링을 위한 필터링된 뉴스 목록 계산
+  // 렌더링용: 카테고리 필터링 (이미 DB에서 필터링해왔지만, 클라이언트 상태 동기화를 위해 한 번 더 확인)
   const filteredDisplayNews = category === 'All' 
     ? news 
     : news.filter(item => item.category === category);
   
-  // 로그인 안 했을 때 보여줄 뉴스 (1개만)
+  // 비로그인 유저: 1개만 보여줌
   const displayedNews = user ? filteredDisplayNews : filteredDisplayNews.slice(0, 1);
 
-
   return (
-    /* ✅ 배경색 다크모드 제거 및 가로 스크롤 방지 추가 */
     <main className="min-h-screen bg-[#f8fafc] text-slate-800 font-sans overflow-x-hidden">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-0 w-full">
         <Header />
@@ -181,15 +174,15 @@ export default function HomeClient({ initialNews }: HomeClientProps) {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mt-6 w-full">
+          {/* 뉴스 피드 영역 (모바일: 전체, PC: 왼쪽 3칸) */}
           <div className="col-span-1 md:col-span-3 relative w-full">
-            {/* 필터링된 뉴스를 전달 */}
             <NewsFeed 
               news={displayedNews} 
               loading={loading || isTranslating} 
               onOpen={setSelectedArticle} 
             />
             
-            {/* ✅ 로그인 유도 구역: 모바일 최적화 및 다크모드 제거 */}
+            {/* 로그인 유도 블러 처리 (비로그인 시) */}
             {!user && !loading && news.length > 0 && (
               <div className="mt-4 sm:mt-6 relative w-full">
                  <div className="space-y-4 sm:space-y-6 opacity-40 blur-md select-none pointer-events-none grayscale">
@@ -215,6 +208,7 @@ export default function HomeClient({ initialNews }: HomeClientProps) {
             )}
           </div>
           
+          {/* 사이드바 영역 (PC에서만 보임) */}
           <div className="hidden md:block col-span-1">
             <Sidebar news={news} category={category} />
           </div>
@@ -225,12 +219,13 @@ export default function HomeClient({ initialNews }: HomeClientProps) {
         <ArticleModal 
           article={selectedArticle} 
           onClose={() => setSelectedArticle(null)} 
-          onVote={handleVote} // 타입 에러 해결됨
+          onVote={handleVote}
         />
       )}
       
       <MobileFloatingBtn />
       
+      {/* 웰컴 모달 */}
       {showWelcome && !user && (
         <div className="fixed inset-0 z-[999] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-300">
            <div className="bg-white w-full max-w-md rounded-[32px] p-1 shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300">
