@@ -121,7 +121,13 @@ def fetch_data_from_gemini(category_name, instructions):
         return None
 
 def update_database(category, data):
-    # 1. 뉴스 저장 (Smart Upsert)
+    """
+    1. search_archive: 무조건 저장 (삭제 안 함, 영구 보관)
+    2. live_news: 저장 후, 30개 넘어가면 삭제 (롤링 업데이트)
+    3. live_rankings: 덮어쓰기 (현재 순위 유지)
+    """
+    
+    # 1. 뉴스 데이터 정리
     news_list = data.get("news_updates", [])
     if news_list:
         clean_news = []
@@ -132,28 +138,38 @@ def update_database(category, data):
                 "title": item["title"],
                 "summary": item["summary"],
                 "link": item.get("link", ""),
-                "created_at": "now()"
+                "created_at": "now()" # 현재 시간
             })
         
+        # [A] 아카이브에 저장 (영구 보관용)
+        try:
+            # on_conflict='ignore'를 쓰면 중복된 건 무시하고 새것만 쌓입니다.
+            # 하지만 supabase-py에서는 upsert가 기본이므로, 중복이면 created_at만 갱신됩니다.
+            supabase.table("search_archive").upsert(clean_news, on_conflict="category,keyword,title").execute()
+            print(f"   🗄️ [Archive] 뉴스 {len(clean_news)}개 보관 완료")
+        except Exception as e:
+            print(f"   ⚠️ 아카이브 저장 실패: {e}")
+
+        # [B] 라이브 뉴스에 저장 (화면 노출용)
         try:
             supabase.table("live_news").upsert(clean_news, on_conflict="category,keyword,title").execute()
-            print(f"   💾 뉴스 {len(clean_news)}개 처리 완료")
+            print(f"   💾 [Live] 뉴스 {len(clean_news)}개 업데이트 완료")
         except Exception as e:
-            print(f"   ⚠️ 뉴스 저장 실패: {e}")
+            print(f"   ⚠️ 라이브 저장 실패: {e}")
 
-    # 2. 뉴스 롤링 업데이트 (오래된 것 삭제)
+    # 2. 뉴스 롤링 업데이트 (Live 테이블만 삭제 수행!)
     try:
         res = supabase.table("live_news").select("id").eq("category", category).order("created_at", desc=True).execute()
         all_ids = [row['id'] for row in res.data]
         
         if len(all_ids) > 30:
-            ids_to_delete = all_ids[30:]
+            ids_to_delete = all_ids[30:] # 31등부터 삭제
             supabase.table("live_news").delete().in_("id", ids_to_delete).execute()
-            print(f"   🧹 오래된 뉴스 {len(ids_to_delete)}개 삭제 완료 (롤링 유지)")
+            print(f"   🧹 [Clean] 오래된 뉴스 {len(ids_to_delete)}개 삭제 (Archive에는 남음)")
     except Exception as e:
         print(f"   ⚠️ 롤링 업데이트 실패: {e}")
 
-    # 3. 랭킹 저장 (덮어쓰기)
+    # 3. 랭킹 저장 (기존과 동일)
     rank_list = data.get("rankings", [])
     if rank_list:
         clean_ranks = []
@@ -171,18 +187,3 @@ def update_database(category, data):
             print(f"   🏆 랭킹 TOP 10 갱신 완료")
         except Exception as e:
             print(f"   ⚠️ 랭킹 저장 실패: {e}")
-
-def main():
-    print("🚀 뉴스 및 랭킹 업데이트 시작")
-    print(f"ℹ️ 사용할 AI 모델: {SELECTED_MODEL_NAME}")
-    
-    for category, instructions in CATEGORIES.items():
-        data = fetch_data_from_gemini(category, instructions)
-        if data:
-            update_database(category, data)
-        time.sleep(2)
-
-    print("✅ 모든 작업 완료")
-
-if __name__ == "__main__":
-    main()
