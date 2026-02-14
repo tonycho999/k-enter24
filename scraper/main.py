@@ -39,8 +39,8 @@ def run_master_scraper():
         
         try:
             for seed in seeds:
-                # 시드별로 기사를 넉넉히 가져옴 (유료 버전 대응)
-                news_items = crawler.get_naver_api_news(seed, display=20)
+                # [수정] 24시간 이내 뉴스를 더 많이 확보하기 위해 display를 20에서 100으로 상향했습니다.
+                news_items = crawler.get_naver_api_news(seed, display=100)
                 for item in news_items:
                     if is_within_24h(item.get('pubDate')):
                         combined_text = f"Title: {item['title']}\nSummary: {item['description']}"
@@ -52,7 +52,7 @@ def run_master_scraper():
             
             # 기사가 1개라도 있으면 트렌드 분석을 진행합니다.
             if len(raw_text_data) < 1:
-                print("   ⚠️ 기사가 전혀 없어 스킵합니다.")
+                print("   ⚠️ 기사가 너무 적어 스킵합니다.")
                 continue
                 
         except Exception as e:
@@ -79,8 +79,8 @@ def run_master_scraper():
             print(f"   🔍 Rank {rank+1}: '{kw}' ({k_type}) 분석 중...")
             
             try:
-                # 특정 키워드로 기사 검색 (유료 버전이므로 50개씩 확인)
-                raw_articles = crawler.get_naver_api_news(kw, display=50)
+                # [수정] 특정 키워드로 검색 시에도 기사를 50개에서 100개로 상향하여 데이터 누락을 방지합니다.
+                raw_articles = crawler.get_naver_api_news(kw, display=100)
                 if not raw_articles: continue
 
                 full_contents = []
@@ -90,8 +90,7 @@ def run_master_scraper():
                 for art in raw_articles:
                     if not is_within_24h(art.get('pubDate')): continue
                     
-                    # [중요] target_keyword를 빼서 'BTS'와 '방탄소년단' 혼용을 허용합니다.
-                    # 들여쓰기 4칸(tab 아님)을 엄격히 준수했습니다.
+                    # [들여쓰기 수정] 에러가 났던 90번 라인의 들여쓰기를 주변 코드와 완벽히 맞췄습니다.
                     text, img = crawler.get_article_data(art['link'])
                     
                     if text: 
@@ -133,7 +132,7 @@ def run_master_scraper():
                     "type": k_type,
                     "title": f"[{kw}] News Update",
                     "summary": briefing,
-                    "link": None, # 브리핑된 뉴스이므로 원문 링크는 생략하거나 첫 기사 링크 사용 가능
+                    "link": None,
                     "image_url": final_img,
                     "score": ai_score,
                     "likes": 0, "dislikes": 0,
@@ -142,7 +141,7 @@ def run_master_scraper():
                 }
                 category_news_list.append(news_item)
                 
-                # Groq 유료 버전은 RPM이 높으므로 대기 시간을 2초에서 0.5초로 단축 가능
+                # Groq 유료 버전은 RPM이 높으므로 대기 시간 유지
                 time.sleep(0.5) 
                 
             except Exception as e:
