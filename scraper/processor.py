@@ -55,7 +55,7 @@ def run_category_process(category):
     {" | ".join(all_titles[:100])}
     
     [Important Rules]
-    - 'search_keyword_kr' MUST be in KOREAN (e.g., '뉴진스', '이정재', '경복궁').
+    - 'search_keyword_kr' MUST be in KOREAN (e.g., '뉴진스', '이정재').
     - 'display_title_en' and 'top_subject_en' MUST be in ENGLISH.
     - For K-Culture: Strictly exclude K-Pop idols or celebrities.
     
@@ -86,8 +86,8 @@ def run_category_process(category):
     # ---------------------------------------------------------
     # 5단계 적용: 최근 4시간 내 사용된 키워드인지 확인 (중복 방지)
     # ---------------------------------------------------------
-    target_kr = rank_res.get("top_person_kr") # 네이버 재검색용 (한국어)
-    target_en = rank_res.get("top_subject_en") # DB 저장용 (영어)
+    target_kr = rank_res.get("top_person_kr") 
+    target_en = rank_res.get("top_subject_en") 
 
     if database.is_keyword_used_recently(category, target_en, hours=4):
         print(f"   🕒 '{target_en}' is on 4-hour cooldown. Skipping article generation.")
@@ -100,7 +100,6 @@ def run_category_process(category):
     deep_items = naver_api.search_news_api(target_kr, display=10, sort='date')
     
     full_texts = []
-    main_link = ""
     main_image = ""
     
     for item in deep_items:
@@ -108,8 +107,9 @@ def run_category_process(category):
         # 본문이 충분히 길고 유효한 경우만 수집
         if crawled['text'] and len(crawled['text']) > 300:
             full_texts.append(crawled['text'])
-            if not main_link: main_link = item['link']
-            if not main_image: main_image = crawled['image']
+            # 첫 번째 유효한 이미지만 보관
+            if not main_image: 
+                main_image = crawled['image']
         
         # 3개의 성공적인 본문을 찾으면 중단
         if len(full_texts) >= 3:
@@ -146,13 +146,16 @@ def run_category_process(category):
     news_res = gemini_api.ask_gemini(article_prompt)
     
     if news_res and news_res.get("content"):
+        # 이미지 보안 검사: 반드시 https://로 시작하는 경우만 허용
+        final_image = main_image if main_image.startswith("https://") else ""
+
         news_item = {
             "category": category,
             "keyword": target_en,
             "title": news_res.get("title"),
             "summary": news_res.get("content"), # 전문 내용을 summary 필드에 저장
-            "link": main_link,
-            "image_url": main_image,
+            # "link": main_link, # 기사 링크 저장 제외 (지시사항 반영)
+            "image_url": final_image, # https가 아니면 빈 값 처리
             "score": 100,
             "created_at": datetime.now().isoformat(),
             "likes": 0
@@ -162,6 +165,6 @@ def run_category_process(category):
         database.save_news_to_live([news_item])
         database.save_news_to_archive([news_item])
         database.cleanup_old_data(category, config.MAX_ITEMS_PER_CATEGORY)
-        print(f"   🎉 SUCCESS: '{target_en}' article has been published.")
+        print(f"   🎉 SUCCESS: '{target_en}' article published (HTTPS image only, no external link).")
     else:
         print("   ❌ AI failed to generate the final article.")
