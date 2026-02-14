@@ -6,11 +6,12 @@ export const revalidate = 60;
 
 export default async function Page() {
   // 1. 서버 사이드에서 뉴스 데이터 가져오기
-  // [수정 포인트] score 내림차순 -> rank 오름차순 (1위가 맨 앞으로 오게)
+  // ✅ [수정] 초기 화면(All) 기준이므로 'rank'가 아니라 'score' 높은 순으로 변경
   const { data: news, error } = await supabase
     .from('live_news')
     .select('*')
-    .order('rank', { ascending: true }); // 1위부터 순서대로 가져옴
+    .order('score', { ascending: false }) // 점수 높은 순 (트렌드순)
+    .limit(30); // 클라이언트 로직과 동일하게 30개만 가져오기
 
   if (error) {
     console.error('Failed to fetch news:', error);
