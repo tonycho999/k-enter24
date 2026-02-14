@@ -18,7 +18,7 @@ SEARCH_QUERIES = {
     "K-Movie": [
         "박스오피스",      # 흥행 성적 위주
         "영화 개봉",       # 개봉작 위주
-        "영화 시사회"  
+        "영화 캐스팅"  
     ],
     "K-Entertain": [
         "예능 시청률",             # 인기 위주
@@ -26,7 +26,7 @@ SEARCH_QUERIES = {
         "OTT 예능 신작"          # 새로운 플랫폼 위주
     ],
     "K-Culture": [
-        "서맛집 추천",   # 음식 (K-Food)
+        "맛집 추천",   # 음식 (K-Food)
         "추천 여행지",   # 여행 (K-Travel)
         "축제 행사"     # 문화/행사 (K-Tradition)
     ]
