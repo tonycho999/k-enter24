@@ -47,7 +47,7 @@ def run_master_scraper():
             raw_text_data = raw_text_data[:60]
             print(f"   🌱 24시간 내 유효 기사 수집: {len(raw_text_data)}개")
             
-            if len(raw_text_data) < 5:
+            if len(raw_text_data) < 1:
                 print("   ⚠️ 기사가 너무 적어 스킵합니다.")
                 continue
                 
