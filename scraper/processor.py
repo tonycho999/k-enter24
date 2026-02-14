@@ -9,7 +9,7 @@ def run_category_process(category):
     print(f"\n🚀 [Processing] Category: {category}")
 
     # ---------------------------------------------------------
-    # 1단계: 100개 이상의 최신 뉴스 제목 수집 (광범위 검색)
+    # 1단계: 100개 이상의 최신 뉴스 제목 수집 및 전처리
     # ---------------------------------------------------------
     all_titles = []
     seen_links = set()
@@ -17,14 +17,16 @@ def run_category_process(category):
     
     queries = config.SEARCH_QUERIES.get(category, [])
     for q in queries:
-        # 최신순(date)으로 각 쿼리당 50개씩 가져와서 중복 제거
         items = naver_api.search_news_api(q, display=50, sort='date')
         for item in items:
             if item['link'] not in seen_links:
                 seen_links.add(item['link'])
-                # 제목 내 HTML 태그 및 특수문자 제거
-                clean_title = item['title'].replace("<b>","").replace("</b>","").replace("&quot;","")
-                all_titles.append(clean_title)
+                
+                # 데이터 전처리: 태그 제거 및 따옴표 통일 (JSON 파싱 에러 방지)
+                t = item['title'].replace("<b>","").replace("</b>","")
+                t = t.replace("&quot;", "'").replace('"', "'").replace("&amp;", "&")
+                t = t.replace("[", "").replace("]", "").replace("포토", "").strip()
+                all_titles.append(t)
         
         if len(all_titles) >= 120: break 
         time.sleep(0.3)
@@ -34,9 +36,8 @@ def run_category_process(category):
         return
 
     # ---------------------------------------------------------
-    # 2단계: 랭킹 1~10위 선정 및 기사 작성용 타겟 추출
+    # 2단계: 랭킹 선정 (한국어 추출 및 영어 번역 병행)
     # ---------------------------------------------------------
-    # 카테고리별 규칙 설정 (사용자 지시사항 반영)
     rank_rule = "Target(Rank): SONG / Search(Person): ARTIST" if category == "K-Pop" else \
                 "Target(Rank): DRAMA / Search(Person): ACTOR" if category == "K-Drama" else \
                 "Target(Rank): MOVIE / Search(Person): ACTOR" if category == "K-Movie" else \
@@ -44,34 +45,39 @@ def run_category_process(category):
                 "Target: PLACE or TRADITION / Search: KEYWORD (EXCLUDE IDOLS)"
 
     print(f"   2️⃣ AI analyzing trends from {len(all_titles[:100])} titles...")
+    
+    # 프롬프트: 한국어 원본 제목을 먼저 찾고, 이를 영어로 번역하도록 지시
     rank_prompt = f"""
-    Analyze these news titles about {category}. 
+    Analyze the following Korean news titles about {category}.
     
     [Task]
-    1. Identify the TOP 10 {rank_rule.split('/')[0]} mentioned most frequently in these titles.
-    2. Pick the SINGLE most trending {rank_rule.split('/')[1]} to be the subject of a deep-dive article.
+    1. Identify the TOP 10 most frequent {rank_rule.split('/')[0]} titles in KOREAN.
+    2. Translate those 10 titles into ENGLISH for display.
+    3. Identify the SINGLE most trending {rank_rule.split('/')[1]} name (KOREAN) associated with the #1 rank.
+    4. Translate that #1 name into ENGLISH for database storage.
     
-    [Titles Data]
-    {" | ".join(all_titles[:100])}
+    [Rules]
+    - 'search_keyword_kr' MUST be the original KOREAN name found in titles.
+    - 'display_title_en' MUST be the professional ENGLISH translation of that Korean title.
+    - 'top_person_kr' MUST be the KOREAN name for Naver search.
+    - 'top_subject_en' MUST be the ENGLISH name of that person.
     
-    [Important Rules]
-    - 'search_keyword_kr' MUST be in KOREAN (e.g., '뉴진스', '이정재').
-    - 'display_title_en' and 'top_subject_en' MUST be in ENGLISH.
-    - For K-Culture: Strictly exclude K-Pop idols or celebrities.
+    [Source Titles]
+    {chr(10).join(all_titles[:100])}
     
-    [Return JSON Format]
+    [Output JSON Format]
     {{
       "rankings": [ 
         {{
           "rank": 1, 
-          "display_title_en": "English Title", 
-          "search_keyword_kr": "한국어 검색어", 
-          "meta": "Brief trending reason in English", 
+          "display_title_en": "English Translated Title", 
+          "search_keyword_kr": "한국어 원본 제목", 
+          "meta": "Trending reason in English", 
           "score": 95
         }} 
       ],
-      "top_person_kr": "한국어 검색어(가수/배우/장소명)",
-      "top_subject_en": "English Subject Name for Database"
+      "top_person_kr": "한국어 이름(재검색용)",
+      "top_subject_en": "English Name(DB용)"
     }}
     """
     
@@ -80,7 +86,7 @@ def run_category_process(category):
         print("   ❌ AI failed to extract ranking data.")
         return
 
-    # 라이브 랭킹 DB 업데이트
+    # 라이브 랭킹 DB 업데이트 (영어 제목으로 저장됨)
     database.save_rankings_to_db(rank_res.get("rankings", []))
     
     # ---------------------------------------------------------
@@ -94,7 +100,7 @@ def run_category_process(category):
         return
 
     # ---------------------------------------------------------
-    # 3단계: 선택된 키워드로 정밀 검색 및 본문 3개 샘플링
+    # 3단계: 선택된 키워드(한국어 이름)로 정밀 검색 및 본문 3개 샘플링
     # ---------------------------------------------------------
     print(f"   3️⃣ Deep searching for '{target_kr}' (Sampling 3 valid articles)...")
     deep_items = naver_api.search_news_api(target_kr, display=10, sort='date')
@@ -104,14 +110,12 @@ def run_category_process(category):
     
     for item in deep_items:
         crawled = naver_api.crawl_article(item['link'])
-        # 본문이 충분히 길고 유효한 경우만 수집
+        # 본문이 유효한 경우만 수집
         if crawled['text'] and len(crawled['text']) > 300:
             full_texts.append(crawled['text'])
-            # 첫 번째 유효한 이미지만 보관
             if not main_image: 
                 main_image = crawled['image']
         
-        # 3개의 성공적인 본문을 찾으면 중단
         if len(full_texts) >= 3:
             break
 
@@ -134,10 +138,9 @@ def run_category_process(category):
     {str(full_texts)[:6000]}
 
     [Requirements]
-    - Headline: Catchy, authoritative, and professional.
-    - Content: Write 4-5 paragraphs of in-depth analysis. 
+    - Headline: Catchy, authoritative, and professional English.
+    - Content: Write 4-5 paragraphs of in-depth analysis in English. 
     - Style: Do NOT just summarize. Create a new narrative that connects the facts with expert insight.
-    - Language: Perfect journalistic English.
 
     [Output JSON Format]
     {{ "title": "Headline", "content": "Full Professional Article Body" }}
@@ -153,18 +156,16 @@ def run_category_process(category):
             "category": category,
             "keyword": target_en,
             "title": news_res.get("title"),
-            "summary": news_res.get("content"), # 전문 내용을 summary 필드에 저장
-            # "link": main_link, # 기사 링크 저장 제외 (지시사항 반영)
-            "image_url": final_image, # https가 아니면 빈 값 처리
+            "summary": news_res.get("content"),
+            "image_url": final_image,
             "score": 100,
             "created_at": datetime.now().isoformat(),
             "likes": 0
         }
         
-        # 최종 DB 저장
         database.save_news_to_live([news_item])
         database.save_news_to_archive([news_item])
         database.cleanup_old_data(category, config.MAX_ITEMS_PER_CATEGORY)
-        print(f"   🎉 SUCCESS: '{target_en}' article published (HTTPS image only, no external link).")
+        print(f"   🎉 SUCCESS: '{target_en}' article published (HTTPS image only).")
     else:
         print("   ❌ AI failed to generate the final article.")
