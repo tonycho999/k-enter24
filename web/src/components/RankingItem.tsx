@@ -1,48 +1,53 @@
 'use client';
 
 import { RankingItemData } from '@/types';
-import { Minus, ArrowUp, ArrowDown } from 'lucide-react';
+import { TrendingUp, Minus, TrendingDown } from 'lucide-react';
 
-interface Props {
+interface RankingItemProps {
   rank: number;
   item: RankingItemData;
 }
 
-export default function RankingItem({ rank, item }: Props) {
-  
-  // 순위 변동 아이콘 로직
-  const getDeltaIcon = (delta: string) => {
-    if (delta === 'NEW') return <span className="text-[8px] font-black text-red-500 bg-red-50 px-1 rounded">NEW</span>;
-    if (delta.includes('▲')) return <span className="text-[9px] text-red-500 flex items-center"><ArrowUp size={8}/>{delta.replace('▲', '')}</span>;
-    if (delta.includes('▼')) return <span className="text-[9px] text-blue-500 flex items-center"><ArrowDown size={8}/>{delta.replace('▼', '')}</span>;
-    return <Minus size={10} className="text-slate-300" />;
+export default function RankingItem({ rank, item }: RankingItemProps) {
+  // 순위 변동 아이콘 (랜덤 예시 로직, 실제 데이터 있으면 교체 가능)
+  // 지금은 단순히 짝수/홀수로 데코레이션만 함
+  const getTrendIcon = () => {
+    if (rank <= 3) return <TrendingUp size={12} className="text-red-500" />;
+    if (rank > 7) return <TrendingDown size={12} className="text-blue-500" />;
+    return <Minus size={12} className="text-slate-300" />;
   };
 
   return (
-    <div className="flex items-center gap-3 py-2 px-2 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer group">
-      {/* 순위 */}
-      <div className="w-6 text-center font-black text-slate-300 group-hover:text-cyan-500 italic">
-        {rank}
+    <div className="flex items-center justify-between py-3 border-b border-slate-50 dark:border-slate-800 last:border-0 hover:bg-slate-50 dark:hover:bg-slate-800/50 px-2 rounded-lg transition-colors group cursor-default">
+      <div className="flex items-center gap-3 overflow-hidden">
+        {/* 순위 숫자 */}
+        <div className={`
+          flex flex-col items-center justify-center w-6 min-w-[24px]
+          ${rank <= 3 ? 'text-cyan-600 dark:text-cyan-400 font-black text-lg' : 'text-slate-400 font-bold text-sm'}
+        `}>
+          {rank}
+        </div>
+
+        {/* 텍스트 정보 */}
+        <div className="flex flex-col min-w-0">
+          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5 truncate">
+            {item.meta_info || item.category} {/* 부가정보 없으면 카테고리 표시 */}
+          </span>
+          <h4 className="text-sm font-bold text-slate-700 dark:text-slate-200 truncate group-hover:text-cyan-600 transition-colors">
+            {item.title}
+          </h4>
+        </div>
       </div>
 
-      {/* 썸네일 (작은 원형) */}
-      <div className="w-8 h-8 rounded-full bg-slate-100 overflow-hidden flex-shrink-0 border border-slate-100 dark:border-slate-700">
-        <img 
-          src={item.image_url || `https://placehold.co/50x50?text=${rank}`} 
-          className="w-full h-full object-cover" 
-          alt="" 
-        />
-      </div>
-
-      {/* 텍스트 정보 */}
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center justify-between">
-          <p className="text-sm font-bold text-slate-700 dark:text-slate-300 line-clamp-1">
-            {item.keyword}
-          </p>
-          <div className="pl-2">
-            {getDeltaIcon(item.delta)}
-          </div>
+      {/* 우측 점수/아이콘 */}
+      <div className="flex flex-col items-end gap-1 pl-2">
+        {item.score && (
+            <span className="text-[9px] font-mono text-slate-300">
+                {item.score.toFixed(0)} pts
+            </span>
+        )}
+        <div className="opacity-50">
+            {getTrendIcon()}
         </div>
       </div>
     </div>
