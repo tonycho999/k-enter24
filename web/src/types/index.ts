@@ -1,25 +1,27 @@
-// src/types/index.ts
-
 export interface LiveNewsItem {
   id: string;
-  created_at: string;
   category: string;
-  rank: number;       // 1 ~ 30
-  keyword: string;    // 예: "뉴진스"
+  keyword: string; // DB에 추가됨
   title: string;
   summary: string;
   link: string;
-  image_url: string | null;
-  score: number;
-  likes: number;
-  dislikes: number;
+  image_url?: string | null;
+  created_at: string;
+  score?: number;   // 트렌드 점수 (옵션)
+  likes: number;    // 좋아요 수 (필수)
 }
 
 export interface RankingItemData {
   id: string;
   category: string;
   rank: number;
-  keyword: string;
-  delta: string;      // "NEW", "-", "▲1" 등
-  image_url: string | null;
+  title: string;
+  meta_info?: string; // 가수 이름, 방송사 등 부가정보
+  score?: number;
+  updated_at?: string;
+}
+
+export interface InsightData {
+  summary: string;
+  generated_at: string;
 }
