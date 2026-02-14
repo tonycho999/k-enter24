@@ -1,171 +1,75 @@
-import time
+# scraper/processor.py
+import database, gemini_api, naver_api
 from datetime import datetime
-import config
-import naver_api
-import gemini_api
-import database
 
 def run_category_process(category):
-    print(f"\n🚀 [Processing] Category: {category}")
+    print(f"\n🚀 [Autonomous Processing] Category: {category}")
 
-    # ---------------------------------------------------------
-    # 1단계: 100개 이상의 최신 뉴스 제목 수집 및 전처리
-    # ---------------------------------------------------------
-    all_titles = []
-    seen_links = set()
-    print(f"   1️⃣ Collecting latest news titles for analysis...")
-    
-    queries = config.SEARCH_QUERIES.get(category, [])
-    for q in queries:
-        items = naver_api.search_news_api(q, display=50, sort='date')
-        for item in items:
-            if item['link'] not in seen_links:
-                seen_links.add(item['link'])
-                
-                # 데이터 전처리: 태그 제거 및 따옴표 통일 (JSON 파싱 에러 방지)
-                t = item['title'].replace("<b>","").replace("</b>","")
-                t = t.replace("&quot;", "'").replace('"', "'").replace("&amp;", "&")
-                t = t.replace("[", "").replace("]", "").replace("포토", "").strip()
-                all_titles.append(t)
-        
-        if len(all_titles) >= 120: break 
-        time.sleep(0.3)
+    # 1. AI에게 직접 구글 검색을 통한 트렌드 분석 요청
+    rank_rule = "SONG titles and ARTIST names" if category == "K-Pop" else \
+                "DRAMA titles and ACTOR names" if category == "K-Drama" else \
+                "MOVIE titles and ACTOR names" if category == "K-Movie" else \
+                "TV SHOW titles and CAST names" if category == "K-Entertain" else \
+                "Hot PLACES and TRADITIONAL culture (Exclude Celebrities)"
 
-    if not all_titles:
-        print(f"   ❌ No titles found for category: {category}")
-        return
+    prompt = f"""
+    Search Google for the latest {category} trends in Korea as of today.
+    1. Identify the TOP 10 trending {rank_rule.split(' and ')[0]}.
+    2. Provide the ENGLISH display title and the original KOREAN title for each.
+    3. Pick the #1 trending SUBJECT (person or place) in KOREAN for a deep-dive search.
 
-    # ---------------------------------------------------------
-    # 2단계: 랭킹 선정 (한국어 추출 및 영어 번역 병행)
-    # ---------------------------------------------------------
-    rank_rule = "Target(Rank): SONG / Search(Person): ARTIST" if category == "K-Pop" else \
-                "Target(Rank): DRAMA / Search(Person): ACTOR" if category == "K-Drama" else \
-                "Target(Rank): MOVIE / Search(Person): ACTOR" if category == "K-Movie" else \
-                "Target(Rank): SHOW / Search(Person): CAST" if category == "K-Entertain" else \
-                "Target: PLACE or TRADITION / Search: KEYWORD (EXCLUDE IDOLS)"
-
-    print(f"   2️⃣ AI analyzing trends from {len(all_titles[:100])} titles...")
-    
-    # 프롬프트: 한국어 원본 제목을 먼저 찾고, 이를 영어로 번역하도록 지시
-    rank_prompt = f"""
-    Analyze the following Korean news titles about {category}.
-    
-    [Task]
-    1. Identify the TOP 10 most frequent {rank_rule.split('/')[0]} titles in KOREAN.
-    2. Translate those 10 titles into ENGLISH for display.
-    3. Identify the SINGLE most trending {rank_rule.split('/')[1]} name (KOREAN) associated with the #1 rank.
-    4. Translate that #1 name into ENGLISH for database storage.
-    
-    [Rules]
-    - 'search_keyword_kr' MUST be the original KOREAN name found in titles.
-    - 'display_title_en' MUST be the professional ENGLISH translation of that Korean title.
-    - 'top_person_kr' MUST be the KOREAN name for Naver search.
-    - 'top_subject_en' MUST be the ENGLISH name of that person.
-    
-    [Source Titles]
-    {chr(10).join(all_titles[:100])}
-    
-    [Output JSON Format]
+    Return results strictly in JSON:
     {{
-      "rankings": [ 
-        {{
-          "rank": 1, 
-          "display_title_en": "English Translated Title", 
-          "search_keyword_kr": "한국어 원본 제목", 
-          "meta": "Trending reason in English", 
-          "score": 95
-        }} 
+      "rankings": [
+        {{"rank": 1, "display_title_en": "English Name", "search_keyword_kr": "한국어 원본", "meta": "Reason", "score": 95}}
       ],
-      "top_person_kr": "한국어 이름(재검색용)",
+      "top_person_kr": "한국어 검색어(재검색용)",
       "top_subject_en": "English Name(DB용)"
     }}
     """
     
-    rank_res = gemini_api.ask_gemini(rank_prompt)
-    if not rank_res or "rankings" not in rank_res:
-        print("   ❌ AI failed to extract ranking data.")
-        return
+    print(f"   1️⃣ AI is searching Google for {category} trends...")
+    rank_res = gemini_api.ask_gemini(prompt)
+    if not rank_res: return
 
-    # 라이브 랭킹 DB 업데이트 (영어 제목으로 저장됨)
+    # 2. 랭킹 저장 (작품 제목 중심)
     database.save_rankings_to_db(rank_res.get("rankings", []))
-    
-    # ---------------------------------------------------------
-    # 5단계 적용: 최근 4시간 내 사용된 키워드인지 확인 (중복 방지)
-    # ---------------------------------------------------------
-    target_kr = rank_res.get("top_person_kr") 
-    target_en = rank_res.get("top_subject_en") 
+
+    # 3. 쿨타임 체크 (인물/장소 중심)
+    target_kr = rank_res.get("top_person_kr")
+    target_en = rank_res.get("top_subject_en")
 
     if database.is_keyword_used_recently(category, target_en, hours=4):
-        print(f"   🕒 '{target_en}' is on 4-hour cooldown. Skipping article generation.")
+        print(f"   🕒 '{target_en}' is on cooldown.")
         return
 
-    # ---------------------------------------------------------
-    # 3단계: 선택된 키워드(한국어 이름)로 정밀 검색 및 본문 3개 샘플링
-    # ---------------------------------------------------------
-    print(f"   3️⃣ Deep searching for '{target_kr}' (Sampling 3 valid articles)...")
-    deep_items = naver_api.search_news_api(target_kr, display=10, sort='date')
+    # 4. 기사 작성을 위한 심층 검색 (여기서만 네이버 API 사용)
+    # 구글 검색 결과만으로는 본문이 부족할 수 있으므로, 정확한 기사 본문은 네이버에서 가져옵니다.
+    print(f"   2️⃣ Deep searching Naver for article details of '{target_kr}'...")
+    deep_items = naver_api.search_news_api(target_kr, display=5, sort='date')
     
     full_texts = []
     main_image = ""
-    
     for item in deep_items:
         crawled = naver_api.crawl_article(item['link'])
-        # 본문이 유효한 경우만 수집
         if crawled['text'] and len(crawled['text']) > 300:
             full_texts.append(crawled['text'])
-            if not main_image: 
+            if not main_image and crawled['image'].startswith("https://"):
                 main_image = crawled['image']
-        
-        if len(full_texts) >= 3:
-            break
+        if len(full_texts) >= 3: break
 
-    if len(full_texts) < 1:
-        print(f"   ❌ Could not retrieve enough article bodies for '{target_kr}'.")
-        return
+    if not full_texts: return
 
-    # ---------------------------------------------------------
-    # 4단계: 베테랑 기자 스타일로 새로운 영어 기사 작성
-    # ---------------------------------------------------------
-    print(f"   4️⃣ Writing Professional Article in English (20-year Veteran Style)...")
-    article_prompt = f"""
-    You are a veteran entertainment journalist with 20 years of experience. 
-    Write a NEW, insightful professional news report in ENGLISH based on the provided 3 Korean articles.
-
-    [Subject]
-    {target_en} ({target_kr})
-
-    [Source Material (Korean)]
-    {str(full_texts)[:6000]}
-
-    [Requirements]
-    - Headline: Catchy, authoritative, and professional English.
-    - Content: Write 4-5 paragraphs of in-depth analysis in English. 
-    - Style: Do NOT just summarize. Create a new narrative that connects the facts with expert insight.
-
-    [Output JSON Format]
-    {{ "title": "Headline", "content": "Full Professional Article Body" }}
-    """
-    
+    # 5. 베테랑 기자 스타일로 영어 기사 작성
+    article_prompt = f"You are a veteran journalist. Write a professional English news report about {target_en} based on these sources: {str(full_texts)[:5000]}. Return JSON: {{'title': '...', 'content': '...'}}"
     news_res = gemini_api.ask_gemini(article_prompt)
-    
-    if news_res and news_res.get("content"):
-        # 이미지 보안 검사: 반드시 https://로 시작하는 경우만 허용
-        final_image = main_image if main_image.startswith("https://") else ""
 
+    if news_res:
         news_item = {
-            "category": category,
-            "keyword": target_en,
-            "title": news_res.get("title"),
-            "summary": news_res.get("content"),
-            "image_url": final_image,
-            "score": 100,
-            "created_at": datetime.now().isoformat(),
-            "likes": 0
+            "category": category, "keyword": target_en,
+            "title": news_res.get("title"), "summary": news_res.get("content"),
+            "image_url": main_image, "score": 100, "created_at": datetime.now().isoformat(), "likes": 0
         }
-        
         database.save_news_to_live([news_item])
         database.save_news_to_archive([news_item])
-        database.cleanup_old_data(category, config.MAX_ITEMS_PER_CATEGORY)
-        print(f"   🎉 SUCCESS: '{target_en}' article published (HTTPS image only).")
-    else:
-        print("   ❌ AI failed to generate the final article.")
+        print(f"   🎉 SUCCESS: '{target_en}' published via Google Search Grounding.")
