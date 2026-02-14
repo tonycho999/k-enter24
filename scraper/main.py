@@ -18,11 +18,16 @@ GOOGLE_API_KEY = os.environ.get("GOOGLE_API_KEY")
 genai.configure(api_key=GOOGLE_API_KEY)
 
 # ---------------------------------------------------------
-# [수정] 모델 이름 변경 (접두어 제거)
-# 'models/'를 빼고 이름만 적어야 에러가 안 납니다.
+# [수정] 모델 및 도구 설정 (핵심 수정)
+# 1. 모델명: 'gemini-1.5-flash' (접두어 없음)
+# 2. 도구: 'google_search_retrieval' -> {'google_search': {}} 로 변경
 # ---------------------------------------------------------
-SELECTED_MODEL_NAME = "gemini-1.5-flash" 
-model = genai.GenerativeModel(SELECTED_MODEL_NAME, tools='google_search_retrieval')
+SELECTED_MODEL_NAME = "gemini-1.5-flash"
+
+# [중요] 최신 Gemini 1.5는 딕셔너리 형태로 도구를 전달해야 안전합니다.
+search_tool = {'google_search': {}} 
+
+model = genai.GenerativeModel(SELECTED_MODEL_NAME, tools=[search_tool])
 
 # ---------------------------------------------------------
 # [설정] 카테고리별 프롬프트 가이드
@@ -171,7 +176,6 @@ def main():
         else:
             print(f"⚠️ {category} 데이터 수집 실패 (Quota 초과 등)")
         
-        # API 호출 제한 방지 (15초 대기)
         print("⏳ 다음 작업을 위해 15초 대기...")
         time.sleep(15)
 
