@@ -137,26 +137,27 @@ export default function HomeClient({ initialNews }: HomeClientProps) {
   };
 
   return (
-    <main className="min-h-screen bg-[#f8fafc] text-slate-800 font-sans dark:bg-slate-950 dark:text-slate-200 transition-colors">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-0">
+    /* ✅ 배경색 다크모드 제거 및 가로 스크롤 방지 추가 */
+    <main className="min-h-screen bg-[#f8fafc] text-slate-800 font-sans overflow-x-hidden">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-0 w-full">
         <Header />
         
-        <div className="flex flex-col gap-0">
-          <div className="mb-1">
+        <div className="flex flex-col gap-0 w-full">
+          <div className="mb-1 w-full overflow-hidden">
              <CategoryNav active={category} setCategory={handleCategoryChange} />
           </div>
           
-          <div className="mt-0"> 
+          <div className="mt-0 w-full"> 
              <InsightBanner insight={news.length > 0 ? news[0].summary : undefined} />
           </div>
           
-          <div className="mt-2">
+          <div className="mt-2 w-full">
              <AdBanner />
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mt-6">
-          <div className="col-span-1 md:col-span-3 relative">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mt-6 w-full">
+          <div className="col-span-1 md:col-span-3 relative w-full">
             {/* 필터링된 뉴스를 전달 */}
             <NewsFeed 
               news={filteredDisplayNews} 
@@ -164,23 +165,24 @@ export default function HomeClient({ initialNews }: HomeClientProps) {
               onOpen={setSelectedArticle} 
             />
             
+            {/* ✅ 로그인 유도 구역: 모바일 최적화 및 다크모드 제거 */}
             {!user && !loading && news.length > 0 && (
-              <div className="mt-6 relative">
-                 <div className="space-y-6 opacity-40 blur-sm select-none pointer-events-none grayscale">
-                    <div className="h-40 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200" />
-                    <div className="h-40 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200" />
+              <div className="mt-4 sm:mt-6 relative w-full">
+                 <div className="space-y-4 sm:space-y-6 opacity-40 blur-md select-none pointer-events-none grayscale">
+                    <div className="h-32 sm:h-40 bg-white rounded-2xl sm:rounded-3xl border border-slate-200" />
+                    <div className="h-32 sm:h-40 bg-white rounded-2xl sm:rounded-3xl border border-slate-200" />
                  </div>
                  
-                 <div className="absolute inset-0 flex flex-col items-center justify-start pt-4">
-                    <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl p-8 rounded-[32px] shadow-2xl border border-slate-100 dark:border-slate-800 text-center max-w-sm mx-auto">
-                        <div className="w-14 h-14 bg-gradient-to-br from-cyan-400 to-blue-600 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg shadow-cyan-200">
-                           <Lock className="text-white" size={24} />
+                 <div className="absolute inset-0 flex flex-col items-center justify-center px-4">
+                    <div className="bg-white/95 backdrop-blur-2xl p-6 sm:p-8 rounded-[24px] sm:rounded-[32px] shadow-2xl border border-slate-100 text-center w-full max-w-[320px] mx-auto">
+                        <div className="w-12 h-12 bg-gradient-to-br from-cyan-400 to-blue-600 rounded-full flex items-center justify-center mx-auto mb-3 shadow-lg shadow-cyan-200">
+                           <Lock className="text-white" size={20} />
                         </div>
-                        <h3 className="text-xl font-black text-slate-900 dark:text-white mb-2">Want to see more?</h3>
-                        <p className="text-sm text-slate-500 dark:text-slate-400 mb-6 leading-relaxed">
+                        <h3 className="text-lg font-black text-slate-900 mb-1 tracking-tight">Want to see more?</h3>
+                        <p className="text-xs text-slate-500 mb-5 leading-relaxed">
                            Sign in to unlock <span className="font-bold text-cyan-600">Real-time K-Trends</span> & <span className="font-bold text-cyan-600">AI Analysis</span>.
                         </p>
-                        <button onClick={handleLogin} className="w-full py-3.5 bg-slate-900 dark:bg-cyan-600 text-white font-bold rounded-xl hover:scale-105 transition-transform shadow-xl">
+                        <button onClick={handleLogin} className="w-full py-3 bg-slate-900 text-white text-sm font-bold rounded-xl active:scale-95 transition-transform shadow-xl">
                           Sign in with Google
                         </button>
                     </div>
@@ -208,7 +210,7 @@ export default function HomeClient({ initialNews }: HomeClientProps) {
       
       {showWelcome && !user && (
         <div className="fixed inset-0 z-[999] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-300">
-           <div className="bg-white dark:bg-slate-900 w-full max-w-md rounded-[32px] p-1 shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300">
+           <div className="bg-white w-full max-w-md rounded-[32px] p-1 shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300">
               <div className="bg-gradient-to-br from-cyan-500 via-blue-600 to-indigo-600 p-8 rounded-[28px] text-center relative overflow-hidden">
                  <div className="absolute top-0 left-0 w-full h-full opacity-20 bg-[url('https://grainy-gradients.vercel.app/noise.svg')]"></div>
                  <div className="relative z-10">
@@ -226,10 +228,10 @@ export default function HomeClient({ initialNews }: HomeClientProps) {
                     </button>
                  </div>
               </div>
-              <div className="p-4 bg-white dark:bg-slate-900 text-center">
+              <div className="p-4 bg-white text-center">
                  <label className="flex items-center justify-center gap-2 cursor-pointer group select-none">
                     <input type="checkbox" className="w-4 h-4 rounded border-slate-300 text-cyan-600 focus:ring-cyan-500 transition-all" checked={dontShowAgain} onChange={(e) => setDontShowAgain(e.target.checked)} />
-                    <span className="text-xs font-bold text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-300 transition-colors">Don't show this again</span>
+                    <span className="text-xs font-bold text-slate-400 group-hover:text-slate-600 transition-colors">Don't show this again</span>
                  </label>
               </div>
            </div>
