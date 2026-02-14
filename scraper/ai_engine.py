@@ -5,7 +5,7 @@ import requests
 from groq import Groq
 
 # =========================================================
-# 1. 모델 선택 로직 (변동 없음)
+# 1. 모델 선택 로직
 # =========================================================
 
 def get_groq_text_models():
@@ -113,36 +113,59 @@ def parse_json_result(text):
     return []
 
 # =========================================================
-# 3. [핵심] 문맥 기반 키워드 추출 (Blacklist 제거됨)
+# 3. [핵심] 카테고리별 맞춤형 분류 규칙 (Strict Mode)
 # =========================================================
 
 def extract_top_entities(category, news_text_data):
     
-    # AI에게 "문맥을 보고 분류하라"고 상세히 지시
+    # 카테고리별로 AI에게 내릴 특별 지령 (배우 금지, 기업 금지 등)
+    specific_rule = ""
+    
+    if category == 'K-Drama':
+        specific_rule = """
+        [CONTEXT: K-DRAMA MODE]
+        1. 'content' MUST be a Drama Title (e.g. 'Squid Game', 'The Glory').
+        2. STRICTLY CLASSIFY ACTORS AS 'person' (e.g. 'Kim Soo-hyun', 'Song Hye-kyo' -> 'person').
+        3. Do NOT include OSTs or Songs as content here.
+        """
+    elif category == 'K-Movie':
+        specific_rule = """
+        [CONTEXT: K-MOVIE MODE]
+        1. 'content' MUST be a Movie Title (e.g. 'Parasite', 'Exhuma').
+        2. STRICTLY CLASSIFY ACTORS/DIRECTORS AS 'person'.
+        """
+    elif category == 'K-Pop':
+        specific_rule = """
+        [CONTEXT: K-POP MODE]
+        1. 'content' MUST be a Song Title or Album Name.
+        2. STRICTLY CLASSIFY SINGERS/GROUPS AS 'person'.
+        """
+    elif category == 'K-Culture':
+        specific_rule = """
+        [CONTEXT: K-CULTURE MODE]
+        1. 'content' MUST be a Food, Place (Hotspot), Fashion Item, or Festival.
+        2. STRICTLY EXCLUDE CORPORATE NEWS (e.g. 'Samsung', 'Expo', 'Business', 'Stock').
+        3. STRICTLY EXCLUDE CELEBRITIES.
+        """
+    
     system_prompt = f"""
     You are a K-Content Trend Analyst for '{category}'. 
     
     [TASK]
     Analyze the news summaries and extract keywords.
-    Crucially, **CLASSIFY** the TYPE of each keyword based on context.
+    Crucially, CLASSIFY the TYPE of each keyword based on the specific rules below.
+    
+    {specific_rule}
     
     [CLASSIFICATION TYPES]
-    1. 'content': ACTUAL TITLES of Songs, Dramas, Movies, TV Shows.
-       (e.g., "The Glory", "Hype Boy", "Squid Game")
-       *NOTE: If 'Music' is the name of a song/album, classify as 'content'.)
-       
-    2. 'person': Specific Names of Singers, Groups, Actors.
-       (e.g., "BTS", "NewJeans", "Kim Soo-hyun")
-       
-    3. 'organization': Platforms, Broadcasters, Agencies. DO NOT confuse these with titles.
-       (e.g., "Netflix", "Disney+", "MBC", "tvN", "HYBE", "Melon")
-       
-    4. 'generic': Common nouns or generic terms.
-       (e.g., "K-Pop", "Review", "Teaser", "Chart", "Update", "OST", "Coming Soon")
+    1. 'content': The ACTUAL TITLE of the work (Drama, Movie, Song) or Trend (Food, Place).
+    2. 'person': Names of Humans (Actors, Singers, Idols, MCs).
+    3. 'organization': Companies, Broadcasters (Netflix, MBC), Agencies (HYBE).
+    4. 'generic': Common words (Review, Update, Chart, Ranking).
 
     [OUTPUT FORMAT]
     - Return a JSON LIST of objects:
-      [{{ "keyword": "Actual Title Here", "type": "content" }}, {{ "keyword": "Netflix", "type": "organization" }}]
+      [{{ "keyword": "Actual Title", "type": "content" }}, {{ "keyword": "Actor Name", "type": "person" }}]
     - Max 40 items.
     - Translate Korean titles to English.
     """
@@ -159,9 +182,7 @@ def extract_top_entities(category, news_text_data):
                 kw = item['keyword']
                 k_type = item['type'].lower()
                 
-                # [스마트 필터링]
-                # 'organization'(방송사)이나 'generic'(일반명사)는 아예 리스트에서 뺍니다.
-                # 오직 'content'(작품)와 'person'(사람)만 남겨서 main.py로 보냅니다.
+                # 'organization'과 'generic'은 무조건 버림
                 if k_type in ['content', 'person']:
                     if kw not in seen:
                         seen.add(kw)
@@ -170,14 +191,14 @@ def extract_top_entities(category, news_text_data):
     return []
 
 # =========================================================
-# 4. 브리핑 생성 (기존 유지)
+# 4. 브리핑 생성
 # =========================================================
 
 def synthesize_briefing(keyword, news_contents):
     system_prompt = f"""
     You are a Professional News Editor. Topic: {keyword}
     [TASK] Write a comprehensive news briefing in ENGLISH (5-20 lines).
-    [CRITICAL] NO <think> tags. If data is invalid, output "INVALID_DATA".
+    [CRITICAL] NO <think> tags. If data is invalid or purely corporate PR, output "INVALID_DATA".
     """
     
     user_input = "\n\n".join(news_contents)[:6000] 
