@@ -44,7 +44,7 @@ export default function Sidebar({ news, category }: SidebarProps) {
           const { data: categoryData, error } = await supabase
             .from('live_rankings')
             .select('*')
-            .eq('category', category.toLowerCase()) // 소문자 변환 주의
+            .eq('category', category) // 소문자 변환 주의
             .order('rank', { ascending: true })
             .limit(10);
             
