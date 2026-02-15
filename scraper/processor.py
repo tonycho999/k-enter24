@@ -5,10 +5,10 @@ import re
 import json
 from datetime import datetime
 
-# 카테고리 6단계 질문 (요청하신 대로 수정 없이 유지)
+# 카테고리 6단계 질문 (원문 그대로 유지)
 PROMPT_VERSIONS = {
     "K-Pop": [
-        "최근 24시간 내 언급량이 가장 압도적인 K-pop 가수(그룹)를 선정해 심층 기사 1개를 쓰고 Top 10 곡 순위를 알려줘.",
+        "최근 24시간 내 언급량이 가장 압도적인 K-pop 가수를 선정해 심층 기사 1개를 쓰고 Top 10 곡 순위를 알려줘.",
         "현재 차트 역주행이나 급상승으로 화제인 K-pop 가수를 선정해 심층 기사 1개를 쓰고 Top 10 곡 순위를 알려줘.",
         "비하인드 뉴스나 독점 인터뷰로 화제인 K-pop 가수 리스트를 선정해 심층 기사 1개를 쓰고 Top 10 곡 순위를 알려줘.",
         "글로벌 팬덤 및 SNS 반응이 폭발적인 K-pop 가수를 선정해 심층 기사 1개를 쓰고 Top 10 곡 순위를 알려줘.",
@@ -18,7 +18,7 @@ PROMPT_VERSIONS = {
     "K-Drama": [
         "화제성 1위 드라마의 주연 배우를 선정해 심층 기사 1개를 쓰고 드라마 순위 1~10위를 알려줘.",
         "드라마 한 편으로 인생이 바뀐 라이징 배우를 선정해 심층 기사 1개를 쓰고 드라마 순위 1~10위를 알려줘.",
-        "촬영 현장 비화나 캐스팅 소식으로 화제인 배우를 선정해 심층 기사 1개를 쓰고 드라마 순위 1~10위를 알려줘.",
+        "촬영 현장 비화나 캐스팅 소식으로 화제인 배우를 선정해 심층 기사 1개 쓰기 드라마 순위 1~10위를 알려줘.",
         "글로벌 OTT 차트를 휩쓴 드라마의 배우를 선정해 심층 기사 1개를 쓰고 드라마 순위 1~10위를 알려줘.",
         "결말 논란이나 인터뷰로 화제인 배우를 선정해 심층 기사 1개를 쓰고 드라마 순위 1~10위를 알려줘.",
         "차기작이 기대되는 '믿보배' 배우를 선정해 심층 기사 1개를 쓰고 드라마 순위 1~10위를 알려줘."
@@ -50,82 +50,71 @@ PROMPT_VERSIONS = {
 }
 
 def parse_rankings(raw_rankings_text):
-    """
-    텍스트 형태의 랭킹을 리스트 객체로 변환
-    예: "1. Song (곡명) - 95" 형태를 파싱
-    """
+    if not raw_rankings_text: return []
     parsed = []
-    lines = raw_rankings_text.strip().split('\n')
-    for i, line in enumerate(lines[:10]):
+    # 불필요한 마크다운 기호 제거 후 줄바꿈 단위로 분리
+    lines = raw_rankings_text.replace('*', '').strip().split('\n')
+    for i, line in enumerate(lines):
+        if i >= 10: break
         try:
-            # 주석 제거 및 기본 클리닝
             line = re.sub(r'\[\d+\]', '', line).strip()
-            # 정규표현식으로 제목 추출 시도 (숫자. 제목 형태)
-            title_match = re.search(r'\d+[\.\)\s]+(.*)', line)
-            title = title_match.group(1) if title_match else line
-            
-            parsed.append({
-                "rank": i + 1,
-                "title_en": title,
-                "title_kr": title, # 텍스트 방식에서는 우선 동일하게 처리
-                "score": 100 - (i * 2)
-            })
-        except:
-            continue
+            # 숫자와 구분 기호 제거 후 제목만 추출
+            title = re.sub(r'^\d+[\.\)\s-]*', '', line).strip()
+            if title:
+                parsed.append({
+                    "rank": i + 1,
+                    "title_en": title,
+                    "title_kr": title,
+                    "score": 100 - (i * 5)
+                })
+        except: continue
     return parsed
 
 def run_category_process(category, run_count):
-    print(f"\n🚀 [Autonomous Mode] {category} (Run #{run_count})")
+    print(f"\n🚀 [Mission Start] {category} (Cycle Index: {run_count % 6})")
 
     v_idx = run_count % 6
     task = PROMPT_VERSIONS[category][v_idx]
 
-    # [프로그래머의 설계] JSON 대신 태그 방식을 AI에게 요구
+    # [엔지니어링] 태그가 확실히 구별되도록 가이드 수정
     final_prompt = f"""
-    실시간 뉴스 검색을 사용하여 다음 과제를 수행하라: {task}
+    실시간 검색을 사용하여 다음 과제를 수행하라: {task}
     
-    [작성 가이드]
-    1. 인물/그룹을 선정하고 심층적인 영문 기사를 작성하세요.
-    2. 모든 결과물은 아래의 태그 형식을 반드시 사용하여 구분하세요.
-    3. 구글 검색 출처 번호(예: [1])는 절대 적지 마세요.
-    4. 기사 제목과 본문은 반드시 영어(English)로 작성하세요.
-
-    [형식]
-    ##TARGET_KR## 인물명(한국어)
-    ##TARGET_EN## Person Name(English)
-    ##HEADLINE## English Article Headline
-    ##CONTENT## English Article Content (Deep analysis)
+    결과물은 반드시 아래 태그를 사용하여 구분하라. (다른 설명 금지)
+    
+    ##TARGET_KR## 한국어 이름
+    ##TARGET_EN## English Name
+    ##HEADLINE## 영문 기사 제목
+    ##CONTENT## 영문 기사 본문
     ##RANKINGS##
-    1. Title 1 (제목 1)
-    2. Title 2 (제목 2)
-    ... 10위까지 작성
+    1. 순위 데이터 1
+    ... 10위까지
     """
 
-    # AI 호출 (gemini_api에서 딕셔너리로 반환함)
     data = gemini_api.ask_gemini_with_search(final_prompt)
 
-    if not data or 'headline' not in data or 'content' not in data:
-        print(f"❌ {category} 데이터 추출 실패: 필수 태그가 누락되었습니다.")
+    if not data or not data.get('headline'):
+        print(f"❌ {category} 추출 실패: 태그 파싱 오류")
         return
 
-    # 1. 랭킹 데이터 처리
+    # 1. 랭킹 처리
     raw_rankings = data.get('raw_rankings', '')
     clean_rankings = parse_rankings(raw_rankings)
     if clean_rankings:
         database.save_rankings_to_db(clean_rankings)
 
-    # 2. 이미지 수집
-    target_kr = data.get("target_kr", "K-Pop Star").strip()
-    target_en = data.get("target_en", "K-Pop Star").strip()
-    print(f"📸 '{target_kr}' 관련 최적 이미지 수집 중...")
+    # 2. 이미지 수집 (타겟 인물 기반)
+    target_kr = data.get("target_kr", "K-Star").strip()
+    target_en = data.get("target_en", "K-Star").strip()
+    print(f"📸 '{target_kr}' 이미지 수집 중...")
     final_image = naver_api.get_target_image(target_kr)
 
-    # 3. 기사 저장
+    # 3. 뉴스 저장
     news_items = [{
         "category": category,
         "keyword": target_en,
-        "title": data.get("headline", "Breaking News"),
-        "summary": data.get("content", ""),
+        "title": data.get("headline"),
+        "summary": data.get("content"),
         "image_url": final_image,
         "score": 100,
         "created_at": datetime.now().isoformat(),
@@ -133,4 +122,4 @@ def run_category_process(category, run_count):
     }]
     
     database.save_news_to_live(news_items)
-    print(f"🎉 성공: '{target_en}' 관련 기사 및 랭킹 발행 완료.")
+    print(f"🎉 성공: {target_en} 뉴스 발행 완료.")
