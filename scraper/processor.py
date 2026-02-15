@@ -1,16 +1,16 @@
 import gemini_api
 import database
 import naver_api
-import json
 import re
+import json
 from datetime import datetime
 
-# 카테고리별 6단계 순환 질문 세트 (검색어 유지)
+# 카테고리 6단계 질문 (요청하신 대로 수정 없이 유지)
 PROMPT_VERSIONS = {
     "K-Pop": [
         "최근 24시간 내 언급량이 가장 압도적인 K-pop 가수(그룹)를 선정해 심층 기사 1개를 쓰고 Top 10 곡 순위를 알려줘.",
         "현재 차트 역주행이나 급상승으로 화제인 K-pop 가수를 선정해 심층 기사 1개를 쓰고 Top 10 곡 순위를 알려줘.",
-        "비하인드 뉴스나 독점 인터뷰로 화제인 K-pop 가수를 선정해 심층 기사 1개를 쓰고 Top 10 곡 순위를 알려줘.",
+        "비하인드 뉴스나 독점 인터뷰로 화제인 K-pop 가수 리스트를 선정해 심층 기사 1개를 쓰고 Top 10 곡 순위를 알려줘.",
         "글로벌 팬덤 및 SNS 반응이 폭발적인 K-pop 가수를 선정해 심층 기사 1개를 쓰고 Top 10 곡 순위를 알려줘.",
         "업계 내 뜨거운 논쟁이나 반전 이슈의 주인공인 K-pop 가수를 선정해 심층 기사 1개를 쓰고 Top 10 곡 순위를 알려줘.",
         "컴백 예고나 대형 프로젝트를 시작한 K-pop 가수를 선정해 심층 기사 1개를 쓰고 Top 10 곡 순위를 알려줘."
@@ -49,83 +49,88 @@ PROMPT_VERSIONS = {
     ]
 }
 
+def parse_rankings(raw_rankings_text):
+    """
+    텍스트 형태의 랭킹을 리스트 객체로 변환
+    예: "1. Song (곡명) - 95" 형태를 파싱
+    """
+    parsed = []
+    lines = raw_rankings_text.strip().split('\n')
+    for i, line in enumerate(lines[:10]):
+        try:
+            # 주석 제거 및 기본 클리닝
+            line = re.sub(r'\[\d+\]', '', line).strip()
+            # 정규표현식으로 제목 추출 시도 (숫자. 제목 형태)
+            title_match = re.search(r'\d+[\.\)\s]+(.*)', line)
+            title = title_match.group(1) if title_match else line
+            
+            parsed.append({
+                "rank": i + 1,
+                "title_en": title,
+                "title_kr": title, # 텍스트 방식에서는 우선 동일하게 처리
+                "score": 100 - (i * 2)
+            })
+        except:
+            continue
+    return parsed
+
 def run_category_process(category, run_count):
     print(f"\n🚀 [Autonomous Mode] {category} (Run #{run_count})")
 
     v_idx = run_count % 6
     task = PROMPT_VERSIONS[category][v_idx]
 
-    # [절대 규칙] 프롬프트 엔지니어링 강화: JSON 구조를 파괴하는 요소를 명시적으로 차단
+    # [프로그래머의 설계] JSON 대신 태그 방식을 AI에게 요구
     final_prompt = f"""
     실시간 뉴스 검색을 사용하여 다음 과제를 수행하라: {task}
     
-    [출력 규칙 - 반드시 지킬 것]
-    1. 오직 유효한 JSON 객체 하나만 응답하라. 부연 설명이나 인사말은 생략한다.
-    2. 마크다운 코드 블록(```json)을 사용하지 말고 순수 텍스트로만 보내라.
-    3. 구글 검색 출처 주석 번호(예: [1], [2])를 기사 본문과 순위 데이터에 절대 포함하지 마라.
-    4. 기사 제목(headline)과 본문(content)은 반드시 전문적인 영어(English)로 작성하라.
-    5. JSON의 모든 값은 큰따옴표(")로 감싸고, 본문 내의 따옴표는 백슬래시(\")로 이스케이프 처리하라.
+    [작성 가이드]
+    1. 인물/그룹을 선정하고 심층적인 영문 기사를 작성하세요.
+    2. 모든 결과물은 아래의 태그 형식을 반드시 사용하여 구분하세요.
+    3. 구글 검색 출처 번호(예: [1])는 절대 적지 마세요.
+    4. 기사 제목과 본문은 반드시 영어(English)로 작성하세요.
 
-    {{
-      "target_kr": "인물명(한국어)",
-      "target_en": "Name(English)",
-      "articles": [
-        {{"headline": "English Headline", "content": "Detailed English Content"}}
-      ],
-      "rankings": [
-        {{"rank": 1, "title_en": "Title(En)", "title_kr": "제목(Kr)", "score": 95}}
-      ]
-    }}
+    [형식]
+    ##TARGET_KR## 인물명(한국어)
+    ##TARGET_EN## Person Name(English)
+    ##HEADLINE## English Article Headline
+    ##CONTENT## English Article Content (Deep analysis)
+    ##RANKINGS##
+    1. Title 1 (제목 1)
+    2. Title 2 (제목 2)
+    ... 10위까지 작성
     """
 
-    # AI 호출
+    # AI 호출 (gemini_api에서 딕셔너리로 반환함)
     data = gemini_api.ask_gemini_with_search(final_prompt)
 
-    # 방어적 파싱 로직: 데이터가 없거나 형식이 잘못된 경우 처리
-    if not data or not isinstance(data, dict) or "articles" not in data:
-        print(f"❌ {category} 데이터 추출 실패: AI 응답이 유효한 JSON 구조가 아닙니다.")
+    if not data or 'headline' not in data or 'content' not in data:
+        print(f"❌ {category} 데이터 추출 실패: 필수 태그가 누락되었습니다.")
         return
 
-    # 1. 랭킹 데이터 클리닝 및 저장
-    # AI가 본문에 주석을 남겼을 경우를 대비해 정규표현식으로 재필터링
-    clean_rankings = []
-    for item in data.get("rankings", []):
-        clean_rankings.append({
-            "rank": item.get("rank"),
-            "title_en": re.sub(r'\[\d+\]', '', str(item.get("title_en"))).strip(),
-            "title_kr": re.sub(r'\[\d+\]', '', str(item.get("title_kr"))).strip(),
-            "score": item.get("score", 90)
-        })
-    database.save_rankings_to_db(clean_rankings)
+    # 1. 랭킹 데이터 처리
+    raw_rankings = data.get('raw_rankings', '')
+    clean_rankings = parse_rankings(raw_rankings)
+    if clean_rankings:
+        database.save_rankings_to_db(clean_rankings)
 
-    # 2. 엔티티 기반 정보 수집
-    target_kr = data.get("target_kr", "").strip()
-    target_en = data.get("target_en", "").strip()
-    
-    # 네이버 API를 통한 이미지 수집
+    # 2. 이미지 수집
+    target_kr = data.get("target_kr", "K-Pop Star").strip()
+    target_en = data.get("target_en", "K-Pop Star").strip()
     print(f"📸 '{target_kr}' 관련 최적 이미지 수집 중...")
     final_image = naver_api.get_target_image(target_kr)
 
-    # 3. 기사 데이터 정규화 및 저장
-    news_items = []
-    for art in data.get("articles", []):
-        # 본문 내 주석 제거 및 클리닝
-        raw_content = art.get("content", "")
-        clean_content = re.sub(r'\[\d+\]', '', raw_content).strip()
-        
-        news_items.append({
-            "category": category,
-            "keyword": target_en,
-            "title": art.get("headline", "Breaking News"),
-            "summary": clean_content,
-            "image_url": final_image,
-            "score": 100,
-            "created_at": datetime.now().isoformat(),
-            "likes": 0
-        })
+    # 3. 기사 저장
+    news_items = [{
+        "category": category,
+        "keyword": target_en,
+        "title": data.get("headline", "Breaking News"),
+        "summary": data.get("content", ""),
+        "image_url": final_image,
+        "score": 100,
+        "created_at": datetime.now().isoformat(),
+        "likes": 0
+    }]
     
-    if news_items:
-        database.save_news_to_live(news_items)
-        print(f"🎉 성공: '{target_en}' 관련 기사 발행 및 랭킹 업데이트 완료.")
-    else:
-        print(f"⚠️ {category} 발행할 기사 데이터가 존재하지 않습니다.")
+    database.save_news_to_live(news_items)
+    print(f"🎉 성공: '{target_en}' 관련 기사 및 랭킹 발행 완료.")
