@@ -1,7 +1,7 @@
 import sys
 import time
 import os
-import random  # 랜덤 시간 생성을 위해 추가
+import random  # 랜덤 시간 생성을 위해 유지
 from datetime import datetime
 import processor
 
@@ -19,26 +19,29 @@ def main():
     results = {"success": 0, "failed": 0}
 
     print(f"📊 Current Cycle Index: {run_count % 6} (Total Runs: {run_count})")
+    print(f"💡 Perplexity Paid Tier Mode: Optimized waiting times.")
 
     for idx, category in enumerate(categories):
         try:
-            print(f"\n==================================================")
+            print(f"\n" + "="*50)
             print(f"🏃 Starting Category: {category}")
             
             # [핵심] 해당 카테고리 프로세스 실행
+            # (내부에서 news_api.ask_news_ai를 호출하도록 processor.py가 수정되어 있어야 합니다)
             processor.run_category_process(category, run_count)
             
             print(f"✅ Finished: {category}")
             results["success"] += 1
             
-            # [전문가 팁] 마지막 카테고리가 아닐 때만 랜덤 휴식 실행
+            # [전문가 팁] 마지막 카테고리가 아닐 때만 짧은 랜덤 휴식 실행
             if idx < len(categories) - 1:
-                # 60,000ms ~ 180,000ms 사이의 랜덤한 밀리초 생성
-                wait_ms = random.randint(60000, 180000)
+                # 유료 계정은 10초 ~ 20초(10,000ms ~ 20,000ms)면 충분합니다.
+                # 너무 빠르면 검색 엔진 측에서 차단할 수 있으므로 최소한의 예의를 지킵니다.
+                wait_ms = random.randint(10000, 20000)
                 wait_sec = wait_ms / 1000.0
                 
-                print(f"💤 [API 할당량 보호] 다음 카테고리 시작 전 랜덤 휴식...")
-                print(f"💤 대기 시간: {wait_ms}ms ({wait_sec:.2f}초)")
+                print(f"💤 [안전 휴식] 다음 카테고리 준비 중...")
+                print(f"💤 대기 시간: {wait_sec:.2f}초")
                 
                 time.sleep(wait_sec)
             
@@ -48,8 +51,9 @@ def main():
             continue
 
     print(f"\n" + "="*50)
-    print(f"🎉 Batch Job Completed.")
+    print(f"🎉 All Categories Processed.")
     print(f"📊 Success: {results['success']}, Failed: {results['failed']}")
+    print(f"⏰ End Time: {datetime.now()} (UTC)")
     print(f"="*50)
     
     sys.exit(0)
