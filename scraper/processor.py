@@ -1,75 +1,71 @@
-# scraper/processor.py
-import database, gemini_api, naver_api
+import gemini_api
+import database
+import naver_api
 from datetime import datetime
 
 def run_category_process(category):
-    print(f"\n🚀 [Autonomous Processing] Category: {category}")
+    print(f"\n🚀 [Processing] {category} with Google Search Grounding")
 
-    # 1. AI에게 직접 구글 검색을 통한 트렌드 분석 요청
-    rank_rule = "SONG titles and ARTIST names" if category == "K-Pop" else \
-                "DRAMA titles and ACTOR names" if category == "K-Drama" else \
-                "MOVIE titles and ACTOR names" if category == "K-Movie" else \
-                "TV SHOW titles and CAST names" if category == "K-Entertain" else \
-                "Hot PLACES and TRADITIONAL culture (Exclude Celebrities)"
+    # 1. 카테고리별 한국어 질문 정의
+    prompts = {
+        "K-Drama": "너는 20년 차 베테랑 연예부 기자야. 최근 24시간 동안의 뉴스 데이터를 실시간 검색해서 한국 드라마와 배우에 대한 기사 중 가장 화제가 된 10개를 분석해줘. 이를 바탕으로 현재 가장 화제가 되는 배우에 대해 심층 기사를 작성해주고, 추가로 드라마 화제성 순위 1위부터 10위를 선정해줘. 오늘의 전반적인 드라마 시장 트렌드를 요약한 뒤, 모든 내용을 영어로 번역하여 JSON 형식으로 보내줘.",
+        "K-Movie": "너는 20년 차 베테랑 영화 전문 기자야. 지난 24시간 동안의 뉴스 데이터를 실시간 검색해서 한국 영화, 개봉작, 영화 배우에 대한 기사 중 화제가 된 10개를 분석해줘. 이를 바탕으로 현재 가장 주목받는 배우 혹은 감독에 대한 전문 기사를 작성하고, 현재 박스오피스 및 영화 화제성 1위부터 10위 순위를 매겨줘. 오늘자 한국 영화계의 주요 동향을 요약하여 영어로 번역한 후 JSON 형식으로 보내줘.",
+        "K-Entertain": "너는 20년 차 베테랑 방송 전문 기자야. 최근 24시간 동안의 뉴스 데이터를 실시간 검색해서 한국 예능 프로그램과 출연진에 대한 기사 중 반응이 뜨거운 10개를 분석해줘. 이를 바탕으로 현재 가장 화제인 예능인(스타)에 대한 기사를 작성하고, 예능 프로그램 화제성 순위 1위부터 10위를 선정해줘. 오늘의 예능 판도와 트렌드를 심층 분석한 내용을 영어로 번역하여 JSON 형식으로 보내줘.",
+        "K-Culture": "너는 20년 차 베테랑 문화부 기자야. 최근 24시간 동안의 뉴스 데이터를 실시간 검색해서 한국의 핫플레이스, 축제, 전통문화, 미식 트렌드에 대한 기사 중 화제가 된 10개를 분석해줘. (아이돌/드라마 등 연예인 기사는 제외해.) 이를 바탕으로 현재 가장 인기 있는 명소나 문화 현상에 대해 기사를 작성해주고, 문화/여행 키워드 순위 1위부터 10위를 선정해줘. 오늘의 한국 라이프스타일 트렌드를 요약하여 영어로 번역한 후 JSON 형식으로 보내줘.",
+        "K-Pop": "너는 20년 차 베테랑 연예부 기자야. 최근 24시간 동안의 뉴스 데이터를 실시간 검색해서 K-pop 가수와 신곡에 대한 기사 중 가장 화제가 된 10개를 분석해줘. 이를 바탕으로 현재 가장 화제가 되는 가수(그룹명)에 대해서 기사를 작성해주고, 추가로 K-pop 곡 순위 1위부터 10위를 선정하고, 오늘의 전반적인 K-pop 트렌드를 심층 요약해서 영어로 번역한 후에 JSON 형식으로 보내줘."
+    }
 
-    prompt = f"""
-    Search Google for the latest {category} trends in Korea as of today.
-    1. Identify the TOP 10 trending {rank_rule.split(' and ')[0]}.
-    2. Provide the ENGLISH display title and the original KOREAN title for each.
-    3. Pick the #1 trending SUBJECT (person or place) in KOREAN for a deep-dive search.
-
-    Return results strictly in JSON:
-    {{
-      "rankings": [
-        {{"rank": 1, "display_title_en": "English Name", "search_keyword_kr": "한국어 원본", "meta": "Reason", "score": 95}}
-      ],
-      "top_person_kr": "한국어 검색어(재검색용)",
-      "top_subject_en": "English Name(DB용)"
-    }}
+    # JSON 규격을 강제하기 위한 안내 문구 추가
+    final_prompt = prompts[category] + """
+    [Format Requirement]
+    Return ONLY a JSON object with:
+    {
+      "target_kr": "Name in Korean",
+      "target_en": "Name in English",
+      "headline": "English Headline",
+      "content": "English Article Content",
+      "rankings": [{"rank": 1, "title_en": "...", "title_kr": "...", "score": 95}],
+      "trend_summary": "English summary"
+    }
     """
-    
-    print(f"   1️⃣ AI is searching Google for {category} trends...")
-    rank_res = gemini_api.ask_gemini(prompt)
-    if not rank_res: return
 
-    # 2. 랭킹 저장 (작품 제목 중심)
-    database.save_rankings_to_db(rank_res.get("rankings", []))
-
-    # 3. 쿨타임 체크 (인물/장소 중심)
-    target_kr = rank_res.get("top_person_kr")
-    target_en = rank_res.get("top_subject_en")
-
-    if database.is_keyword_used_recently(category, target_en, hours=4):
-        print(f"   🕒 '{target_en}' is on cooldown.")
+    # 2. AI 실행
+    data = gemini_api.ask_gemini_with_search(final_prompt)
+    if not data:
+        print(f"❌ Failed to get data for {category}")
         return
 
-    # 4. 기사 작성을 위한 심층 검색 (여기서만 네이버 API 사용)
-    # 구글 검색 결과만으로는 본문이 부족할 수 있으므로, 정확한 기사 본문은 네이버에서 가져옵니다.
-    print(f"   2️⃣ Deep searching Naver for article details of '{target_kr}'...")
-    deep_items = naver_api.search_news_api(target_kr, display=5, sort='date')
-    
-    full_texts = []
-    main_image = ""
-    for item in deep_items:
+    # 3. 랭킹 저장
+    database.save_rankings_to_db(data.get("rankings", []))
+
+    # 4. 쿨타임 체크 (target_en 기준)
+    target_en = data.get("target_en")
+    target_kr = data.get("target_kr")
+    if database.is_keyword_used_recently(category, target_en, hours=4):
+        print(f"🕒 '{target_en}' is on cooldown. Skipping article.")
+        return
+
+    # 5. 이미지 보완 (네이버 이미지 검색 활용)
+    # 제미나이는 URL을 잘 못 줄 수 있으므로 네이버에서 실시간 이미지를 1장 가져옵니다.
+    print(f"📸 Fetching image for {target_kr}...")
+    img_results = naver_api.search_news_api(target_kr, display=5)
+    final_image = ""
+    for item in img_results:
         crawled = naver_api.crawl_article(item['link'])
-        if crawled['text'] and len(crawled['text']) > 300:
-            full_texts.append(crawled['text'])
-            if not main_image and crawled['image'].startswith("https://"):
-                main_image = crawled['image']
-        if len(full_texts) >= 3: break
+        if crawled['image'].startswith("https://"):
+            final_image = crawled['image']
+            break
 
-    if not full_texts: return
-
-    # 5. 베테랑 기자 스타일로 영어 기사 작성
-    article_prompt = f"You are a veteran journalist. Write a professional English news report about {target_en} based on these sources: {str(full_texts)[:5000]}. Return JSON: {{'title': '...', 'content': '...'}}"
-    news_res = gemini_api.ask_gemini(article_prompt)
-
-    if news_res:
-        news_item = {
-            "category": category, "keyword": target_en,
-            "title": news_res.get("title"), "summary": news_res.get("content"),
-            "image_url": main_image, "score": 100, "created_at": datetime.now().isoformat(), "likes": 0
-        }
-        database.save_news_to_live([news_item])
-        database.save_news_to_archive([news_item])
-        print(f"   🎉 SUCCESS: '{target_en}' published via Google Search Grounding.")
+    # 6. 최종 DB 저장
+    news_item = {
+        "category": category,
+        "keyword": target_en,
+        "title": data.get("headline"),
+        "summary": data.get("content"),
+        "image_url": final_image,
+        "score": 100,
+        "created_at": datetime.now().isoformat(),
+        "likes": 0
+    }
+    database.save_news_to_live([news_item])
+    print(f"🎉 Published: {data.get('headline')}")
