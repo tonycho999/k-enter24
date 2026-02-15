@@ -1,14 +1,13 @@
 import sys
 import time
 import os
-import random  # 랜덤 시간 생성을 위해 유지
+import random 
 from datetime import datetime
 import processor
 
 def main():
     print(f"🤖 GitHub Action Scraper Started at {datetime.now()} (UTC)")
     
-    # 1. GitHub Actions에서 실행 횟수(RUN_COUNT)를 가져옵니다.
     try:
         run_count = int(os.getenv("RUN_COUNT", "0"))
     except (ValueError, TypeError):
@@ -24,38 +23,38 @@ def main():
     for idx, category in enumerate(categories):
         try:
             print(f"\n" + "="*50)
-            print(f"🏃 Starting Category: {category}")
+            # ✅ [보완 1] 현재 처리 중인 카테고리를 명확히 출력하여 추적성을 높입니다.
+            print(f"🏃 [{idx + 1}/{len(categories)}] Processing: {category}")
             
             # [핵심] 해당 카테고리 프로세스 실행
-            # (내부에서 news_api.ask_news_ai를 호출하도록 processor.py가 수정되어 있어야 합니다)
+            # 내부 로직에서 AI 응답의 카테고리 태그보다 이 'category' 변수를 우선하도록 
+            # processor.run_category_process가 설계되어 있어야 합니다.
             processor.run_category_process(category, run_count)
             
-            print(f"✅ Finished: {category}")
+            print(f"✅ Success: {category}")
             results["success"] += 1
             
-            # [전문가 팁] 마지막 카테고리가 아닐 때만 짧은 랜덤 휴식 실행
             if idx < len(categories) - 1:
-                # 유료 계정은 10초 ~ 20초(10,000ms ~ 20,000ms)면 충분합니다.
-                # 너무 빠르면 검색 엔진 측에서 차단할 수 있으므로 최소한의 예의를 지킵니다.
-                wait_ms = random.randint(10000, 20000)
-                wait_sec = wait_ms / 1000.0
-                
-                print(f"💤 [안전 휴식] 다음 카테고리 준비 중...")
-                print(f"💤 대기 시간: {wait_sec:.2f}초")
-                
+                # 유료 계정 안정권인 10~20초 유지
+                wait_sec = random.uniform(10, 20)
+                print(f"💤 [Safe Interval] Waiting {wait_sec:.2f}s for next category...")
                 time.sleep(wait_sec)
             
         except Exception as e:
-            print(f"🚨 Error in {category}: {e}")
+            # ✅ [보완 2] 에러 발생 시 어느 카테고리에서 났는지 더 상세히 출력합니다.
+            print(f"🚨 CRITICAL ERROR in {category}: {str(e)}")
             results["failed"] += 1
+            # 하나가 실패해도 다음 카테고리는 계속 진행합니다.
             continue
 
     print(f"\n" + "="*50)
-    print(f"🎉 All Categories Processed.")
-    print(f"📊 Success: {results['success']}, Failed: {results['failed']}")
-    print(f"⏰ End Time: {datetime.now()} (UTC)")
+    print(f"🎉 Batch Processing Completed.")
+    print(f"📊 Summary | Success: {results['success']} | Failed: {results['failed']}")
+    print(f"⏰ Finished at: {datetime.now()} (UTC)")
     print(f"="*50)
     
+    # 실패가 하나라도 있으면 Action 결과에 경고를 남기기 위해 0이 아닌 값으로 종료할 수 있으나,
+    # 여기서는 전체 흐름을 위해 0으로 종료합니다.
     sys.exit(0)
 
 if __name__ == "__main__":
