@@ -3,73 +3,103 @@ import database
 import naver_api
 from datetime import datetime
 
-def run_category_process(category):
-    print(f"\n🚀 [Processing] {category} with Google Search Grounding")
+# 카테고리별 6단계 순환 질문 세트 (총 30개)
+PROMPT_VERSIONS = {
+    "K-Pop": [
+        "20년 차 베테랑 연예기자로서 지난 24시간 내 언급량이 가장 압도적인 K-pop 가수를 선정해. 해당 가수(그룹)에 대해 서로 다른 관점을 담은 심층 기사 10개를 작성하고, Top 10 Music Chart를 영어 JSON으로 줘.",
+        "지난 24시간 내 차트 역주행이나 급상승으로 화제인 K-pop 가수를 선정해. 그 가수의 성공 비결과 화제성을 다룬 심층 기사 10개를 작성하고, Top 10 Music Chart를 영어 JSON으로 줘.",
+        "최근 공개된 비하인드나 독점 인터뷰로 화제가 된 K-pop 가수를 선정해. 해당 가수의 숨겨진 면모와 비화를 담은 심층 기사 10개를 작성하고, Top 10 Music Chart를 영어 JSON으로 줘.",
+        "빌보드나 해외 SNS에서 가장 핫한 K-pop 가수를 선정해. 그 가수의 글로벌 영향력을 다각도로 분석한 심층 기사 10개를 작성하고, Top 10 Music Chart를 영어 JSON으로 줘.",
+        "현재 업계 내 뜨거운 논쟁이나 큰 반전의 주인공이 된 K-pop 가수를 선정해. 해당 가수를 둘러싼 이슈를 베테랑 기자의 시각으로 분석한 심층 기사 10개를 작성하고, Top 10 Music Chart를 영어 JSON으로 줘.",
+        "컴백 직전이거나 대형 프로젝트를 시작한 K-pop 가수를 선정해. 해당 가수의 향후 행보와 기대감을 담은 심층 기사 10개를 작성하고, Top 10 Music Chart를 영어 JSON으로 줘."
+    ],
+    "K-Drama": [
+        "시청률과 화제성이 가장 높은 드라마의 배우를 선정해. 해당 배우의 연기력과 캐릭터 분석을 담은 심층 기사 10개를 작성하고, Drama Ranking를 영어 JSON으로 줘.",
+        "드라마 한 편으로 인생이 바뀐 라이징 배우를 선정해. 그 배우의 성장 과정과 매력을 다룬 심층 기사 10개를 작성하고, Drama Ranking를 영어 JSON으로 줘.",
+        "촬영 현장 미담이나 캐스팅 비화로 화제인 배우를 선정해. 해당 배우의 인간적인 면모를 다룬 심층 기사 10개를 작성하고, Drama Ranking를 영어 JSON으로 줘.",
+        "넷플릭스 등 글로벌 차트를 휩춘 드라마의 배우를 선정해. 글로벌 스타로 거듭난 해당 배우에 대한 심층 기사 10개를 작성하고, Drama Ranking를 영어 JSON으로 줘.",
+        "캐스팅 논란이나 결말 관련 인터뷰로 화제인 배우를 선정해. 이슈의 중심에 선 해당 배우에 대한 심층 기사 10개를 작성하고, Drama Ranking를 영어 JSON으로 줘.",
+        "차기작 소식이나 차세대 믿고 보는 배우로 꼽힌 배우를 선정해. 배우의 필모그래피와 미래를 다룬 심층 기사 10개를 작성하고, Drama Ranking를 영어 JSON으로 줘."
+    ],
+    "K-Movie": [
+        "박스오피스 1위 영화의 핵심 배우나 감독을 선정해. 영화의 흥행 요소와 인물의 활약을 담은 심층 기사 10개를 작성하고, 한국 Box Office Top 10를 영어 JSON으로 줘.",
+        "독립영화나 저예산 영화에서 발굴된 천재적 영화인을 선정해. 그 인물의 예술 세계를 다룬 심층 기사 10개를 작성하고, 한국 Box Office Top 10를 영어 JSON으로 줘.",
+        "제작 과정의 어려움을 극복하거나 독특한 연출로 화제인 영화인을 선정해. 제작 비하인드를 담은 심층 기사 10개를 작성하고, 한국 Box Office Top 10를 영어 JSON으로 줘.",
+        "해외 영화제 수상이나 해외 진출로 국위선양 중인 영화인을 선정해. 세계가 주목하는 이유를 담은 심층 기사 10개를 작성하고, 한국 Box Office Top 10를 영어 JSON으로 줘.",
+        "최근 영화계 이슈나 논쟁의 중심이 된 영화인을 선정해. 베테랑 기자의 날카로운 비평을 담은 심층 기사 10개를 작성하고, 한국 Box Office Top 10를 영어 JSON으로 줘.",
+        "대작 개봉을 앞두고 홍보 활동 중인 가장 핫한 영화인을 선정해. 신작에 대한 기대감을 담은 심층 기사 10개를 작성하고, 한국 Box Office Top 10를 영어 JSON으로 줘."
+    ],
+    "K-Entertain": [
+        "현재 시청률 1위 예능을 이끄는 메인 예능인/MC를 선정해. 그의 리더십과 유머 감각을 다룬 심층 기사 10개를 작성하고, Variety Show Trends top 10를 영어 JSON으로 줘.",
+        "유튜브나 OTT 예능에서 제2의 전성기를 맞은 예능인을 선정해. 달라진 위상과 트렌드를 분석한 심층 기사 10개를 작성하고, Variety Show Trends top 10를 영어 JSON으로 줘.",
+        "출연진 간의 환상적인 케미로 화제인 예능인을 선정해. 관계성에서 오는 재미를 분석한 심층 기사 10개를 작성하고, Variety Show Trends top 10를 영어 JSON으로 줘.",
+        "해외 버전 예능이나 글로벌 팬덤이 강력한 예능인을 선정해. 세계를 웃기는 그의 매력을 다룬 심층 기사 10개를 작성하고, Variety Show Trends top 10를 영어 JSON으로 줘.",
+        "태도 논란이나 섭외 이슈 등 뜨거운 감자가 된 예능인을 선정해. 사건의 본질을 짚어주는 심층 기사 10개를 작성하고, Variety Show Trends top 10를 영어 JSON으로 줘.",
+        "오랜만에 예능으로 복귀하거나 새 시즌을 시작한 예능인을 선정해. 그의 활약 전망을 담은 심층 기사 10개를 작성하고, Variety Show Trends top 10를 영어 JSON으로 줘."
+    ],
+    "K-Culture": [
+        "현재 가장 핫한 전시나 팝업스토어를 기획한 문화인/기획자를 선정해. 기획 의도와 인기를 다룬 심층 기사 10개를 작성하고, K-Culture Hot Picks top 10를 영어 JSON으로 줘.",
+        "MZ세대가 열광하는 새로운 문화를 선도하는 인플루언서/예술가를 선정해. 트렌드 분석을 담은 심층 기사 10개를 작성하고, K-Culture Hot Picks top 10를 영어 JSON으로 줘.",
+        "전통을 힙하게 재해석해 화제가 된 장인/예술가를 선정해. 그의 철학과 작품 세계를 담은 심층 기사 10개를 작성하고, K-Culture Hot Picks top 10를 영어 JSON으로 줘.",
+        "외국인들에게 K-푸드나 한국 문화를 알린 일등공신 인물을 선정해. 그의 영향력을 다룬 심층 기사 10개를 작성하고, K-Culture Hot Picks top 10를 영어 JSON으로 줘.",
+        "지역 소멸 방지나 공익적 문화 활동으로 화제인 인물을 선정해. 변화하는 한국 문화를 기록한 심층 기사 10개를 작성하고, K-Culture Hot Picks top 10를 영어 JSON으로 줘.",
+        "새로운 랜드마크 건립이나 초대형 축제를 총괄한 인물을 선정해. 미래의 한국 문화를 전망한 심층 기사 10개를 작성하고, K-Culture Hot Picks top 10를 영어 JSON으로 줘."
+    ]
+}
 
-    # 1. 카테고리별 베테랑 기자 페르소나 질문 정의
-    prompts = {
-        "K-Drama": "너는 20년 차 베테랑 연예부 기자야. 최근 24시간 동안의 뉴스 데이터를 실시간 검색해서 한국 드라마와 배우에 대한 기사 중 가장 화제가 된 10개를 분석해줘. 이를 바탕으로 현재 가장 화제가 되는 배우에 대해 심층 기사를 작성해주고, 추가로 드라마 화제성 순위 1위부터 10위를 선정해줘. 오늘의 전반적인 드라마 시장 트렌드를 요약한 뒤, 모든 내용을 영어로 번역하여 JSON 형식으로 보내줘.",
-        "K-Movie": "너는 20년 차 베테랑 영화 전문 기자야. 지난 24시간 동안의 뉴스 데이터를 실시간 검색해서 한국 영화, 개봉작, 영화 배우에 대한 기사 중 화제가 된 10개를 분석해줘. 이를 바탕으로 현재 가장 주목받는 배우 혹은 감독에 대한 전문 기사를 작성하고, 현재 박스오피스 및 영화 화제성 1위부터 10위 순위를 매겨줘. 오늘자 한국 영화계의 주요 동향을 요약하여 영어로 번역한 후 JSON 형식으로 보내줘.",
-        "K-Entertain": "너는 20년 차 베테랑 방송 전문 기자야. 최근 24시간 동안의 뉴스 데이터를 실시간 검색해서 한국 예능 프로그램과 출연진에 대한 기사 중 반응이 뜨거운 10개를 분석해줘. 이를 바탕으로 현재 가장 화제인 예능인(스타)에 대한 기사를 작성하고, 예능 프로그램 화제성 순위 1위부터 10위를 선정해줘. 오늘의 예능 판도와 트렌드를 심층 분석한 내용을 영어로 번역하여 JSON 형식으로 보내줘.",
-        "K-Culture": "너는 20년 차 베테랑 문화부 기자야. 최근 24시간 동안의 뉴스 데이터를 실시간 검색해서 한국의 핫플레이스, 축제, 전통문화, 미식 트렌드에 대한 기사 중 화제가 된 10개를 분석해줘. (아이돌/드라마 등 연예인 기사는 제외해.) 이를 바탕으로 현재 가장 인기 있는 명소나 문화 현상에 대해 기사를 작성해주고, 문화/여행 키워드 순위 1위부터 10위를 선정해줘. 오늘의 한국 라이프스타일 트렌드를 요약하여 영어로 번역한 후 JSON 형식으로 보내줘.",
-        "K-Pop": "너는 20년 차 베테랑 연예부 기자야. 최근 24시간 동안의 뉴스 데이터를 실시간 검색해서 K-pop 가수와 신곡에 대한 기사 중 가장 화제가 된 10개를 분석해줘. 이를 바탕으로 현재 가장 화제가 되는 가수(그룹명)에 대해서 기사를 작성해주고, 추가로 K-pop 곡 순위 1위부터 10위를 선정하고, 오늘의 전반적인 K-pop 트렌드를 심층 요약해서 영어로 번역한 후에 JSON 형식으로 보내줘."
-    }
+def run_category_process(category, run_count):
+    print(f"\n🚀 [Autonomous Mode] {category} (Run #{run_count})")
 
-    # JSON 규격 강제를 위한 프롬프트 엔지니어링
-    final_prompt = prompts[category] + """
+    # 1. 6개 버전 중 순환 선택
+    v_idx = run_count % 6
+    base_prompt = PROMPT_VERSIONS[category][v_idx]
+
+    # 2. JSON 규격 강제 (심층 기사 10개 및 랭킹 10개)
+    final_prompt = base_prompt + """
     
-    [Format Requirement]
-    Return ONLY a JSON object with the following keys:
+    [IMPORTANT: Return ONLY a valid JSON object]
     {
-      "target_kr": "Main Subject Name in Korean",
-      "target_en": "Main Subject Name in English",
-      "headline": "Professional English Headline",
-      "content": "Professional English Article Body (4-5 paragraphs)",
-      "rankings": [
-        {"rank": 1, "title_en": "English Title", "title_kr": "Korean Title", "score": 95}
+      "target_kr": "인물/그룹명(한국어)",
+      "target_en": "Person/Group Name(English)",
+      "articles": [
+        {"headline": "English Headline 1", "content": "English content 1 (Professional journalist style)"},
+        ... 총 10개의 서로 다른 관점의 기사 객체
       ],
-      "trend_summary": "In-depth English trend summary"
+      "rankings": [
+        {"rank": 1, "title_en": "Title (English)", "title_kr": "제목(한국어)", "score": 98},
+        ... 총 10개의 작품 제목 객체
+      ]
     }
     """
 
-    # 2. AI 실행 (Google Search Grounding)
-    print(f"   🔍 AI is searching and analyzing {category} news...")
+    # 3. AI 호출
     data = gemini_api.ask_gemini_with_search(final_prompt)
-    
-    if not data or "rankings" not in data:
-        print(f"   ❌ Failed to get valid data for {category}")
+    if not data or "articles" not in data:
+        print(f"❌ 데이터 추출 실패")
         return
 
-    # 3. 라이브 랭킹 업데이트
+    # 4. 랭킹 저장
     database.save_rankings_to_db(data.get("rankings", []))
 
-    # 4. 쿨타임 체크 (DB 중복 방지)
-    target_en = data.get("target_en")
+    # 5. 인물 이미지 수집 (네이버 API)
     target_kr = data.get("target_kr")
-    
-    if database.is_keyword_used_recently(category, target_en, hours=4):
-        print(f"   🕒 '{target_en}' is on cooldown. Skipping article publication.")
-        return
-
-    # 5. 이미지 보완 (네이버 이미지 검색 API 활용)
-    # 정식 API를 사용하여 고화질 HTTPS 이미지를 가져옵니다.
-    print(f"   📸 Fetching high-quality image for '{target_kr}'...")
     final_image = naver_api.get_target_image(target_kr)
 
-    # 6. 최종 DB 저장
-    news_item = {
-        "category": category,
-        "keyword": target_en,
-        "title": data.get("headline"),
-        "summary": data.get("content"),
-        "image_url": final_image,
-        "score": 100,
-        "created_at": datetime.now().isoformat(),
-        "likes": 0
-    }
+    # 6. 기사 10개 저장 (루프)
+    target_en = data.get("target_en")
+    news_items = []
+    for art in data.get("articles", []):
+        news_items.append({
+            "category": category,
+            "keyword": target_en,
+            "title": art.get("headline"),
+            "summary": art.get("content"),
+            "image_url": final_image,
+            "score": 100,
+            "created_at": datetime.now().isoformat(),
+            "likes": 0
+        })
     
-    database.save_news_to_live([news_item])
-    # 아카이브 저장 및 데이터 클린업 (필요 시)
-    database.save_news_to_archive([news_item])
-    
-    print(f"   🎉 SUCCESS: '{data.get('headline')}' has been published.")
+    # 7. DB 최종 전송
+    database.save_news_to_live(news_items)
+    print(f"🎉 성공: {target_en}에 대한 10개의 기사가 발행되었습니다.")
