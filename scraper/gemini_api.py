@@ -10,33 +10,44 @@ API_KEY = os.getenv("GOOGLE_API_KEY")
 def ask_gemini_with_search_debug(prompt):
     if not API_KEY: return None, "API_KEY_MISSING"
 
-    # [수정] 가장 안정적인 v1 버전 주소로 변경
-    url = f"https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key={API_KEY.strip()}"
+    # [수정] 구글 검색(tools) 기능을 지원하는 v1beta 엔드포인트로 복구
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={API_KEY.strip()}"
     headers = {"Content-Type": "application/json"}
     
+    # [구조 최적화] v1beta 규격에 맞춘 페이로드
     payload = {
         "contents": [{"parts": [{"text": prompt}]}],
-        "tools": [{"google_search_retrieval": {}}], # 구글 검색 도구 사용
+        "tools": [{
+            "google_search_retrieval": {} # 구글 실시간 검색 활성화
+        }],
         "generationConfig": {
             "temperature": 0.7,
-            "maxOutputTokens": 2048 # 응답 길이 보장
+            "topP": 0.9,
+            "maxOutputTokens": 2048
         }
     }
 
-    for attempt in range(2): # 재시도 횟수
+    for attempt in range(2):
         try:
             resp = requests.post(url, headers=headers, json=payload, timeout=120)
             
-            # 404 에러 등이 발생했을 때 원인을 파악하기 위해 로그 강화
+            # 에러 발생 시 상세 로그 기록
             if resp.status_code != 200:
                 error_detail = f"HTTP_{resp.status_code}: {resp.text}"
-                print(f"🚨 API 호출 실패: {error_detail}")
                 return None, error_detail
 
             res_json = resp.json()
-            raw_text = res_json['candidates'][0]['content']['parts'][0]['text']
             
-            # [기존과 동일한 태그 파싱 로직]
+            # 응답 구조에서 텍스트 추출 (v1beta 대응)
+            try:
+                raw_text = res_json['candidates'][0]['content']['parts'][0]['text']
+            except (KeyError, IndexError):
+                return None, f"RESPONSE_STRUCTURE_ERROR: {str(res_json)}"
+            
+            # 검색 주석([1]) 제거
+            raw_text = re.sub(r'\[\d+\]', '', raw_text)
+            
+            # 태그 파싱 로직 (기존과 동일하되 더 견고하게)
             def get_content(tag, text):
                 pattern = rf"(?:\*+|#+)?{tag}(?:\*+|#+)?[:\s-]*(.*?)(?=\s*(?:#+|TARGET|HEADLINE|CONTENT|RANKINGS)|$)"
                 match = re.search(pattern, text, re.DOTALL | re.IGNORECASE)
