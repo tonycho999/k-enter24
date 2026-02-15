@@ -20,7 +20,8 @@ def ask_gemini_with_search(prompt):
         "contents": [{"parts": [{"text": prompt}]}],
         "tools": [{"google_search_retrieval": {}}],
         "generationConfig": {
-            "temperature": 0.1 # 최대한 보수적으로 답변 유도
+            "temperature": 0.0, # 가장 기계적이고 일관된 답변 유도
+            "topP": 0.8
         }
     }
 
@@ -31,26 +32,32 @@ def ask_gemini_with_search(prompt):
                 res_json = resp.json()
                 text = res_json['candidates'][0]['content']['parts'][0]['text']
                 
-                # [무적 파싱 로직] 텍스트 내에서 가장 바깥쪽 { } 를 찾아 추출
+                # 1. 텍스트 내의 모든 구글 검색 주석([1], [2] 등)을 선제적으로 제거
+                text = re.sub(r'\[\d+\]', '', text)
+                
+                # 2. 마크다운 기호 제거
+                text = text.replace("```json", "").replace("```", "")
+
+                # 3. 가장 바깥쪽의 { } 구간 추출
                 match = re.search(r'(\{.*\})', text, re.DOTALL)
                 if match:
                     json_str = match.group(1)
-                    # 1. 마크다운 코드 블록 기호 제거
-                    json_str = json_str.replace("```json", "").replace("```", "")
-                    # 2. 구글 검색 주석([1], [2] 등) 제거
-                    json_str = re.sub(r'\[\d+\]', '', json_str)
-                    # 3. 제어 문자 및 줄바꿈 정리
+                    
+                    # 4. JSON 내부의 줄바꿈 문자가 파싱을 깨뜨리지 않게 처리
+                    # 본문 내 실제 줄바꿈을 \\n으로 치환
+                    json_str = json_str.replace('\n', '\\n')
+                    # 하지만 키/값 사이의 구조적 줄바꿈은 복원해야 하므로 다시 정제 (복잡한 작업 생략하고 클린업)
                     clean_json = re.sub(r'[\x00-\x1F\x7F]', '', json_str)
                     
                     try:
-                        return json.loads(clean_json)
+                        # 텍스트가 이미 정제되었으므로 바로 로드 시도
+                        return json.loads(json_str) 
                     except json.JSONDecodeError:
-                        # 따옴표 중복 등 미세한 에러 수정 시도
+                        # 위에서 \n 치환이 문제를 일으켰을 수 있으므로 원본 매치에서 다시 시도
                         try:
-                            fixed_json = json_str.replace("'", '"')
-                            return json.loads(fixed_json)
-                        except:
-                            print(f"❌ JSON 최종 파싱 실패. 원문 확인 필요.")
+                            return json.loads(match.group(1).strip())
+                        except Exception as e:
+                            print(f"❌ JSON 파싱 에러 상세: {e}")
             time.sleep(5)
         except Exception as e:
             print(f"⚠️ 시도 {attempt+1} 실패: {e}")
