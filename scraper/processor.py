@@ -2,9 +2,9 @@ import gemini_api
 import database
 import naver_api
 import re
-import json
 from datetime import datetime
 
+# PROMPT_VERSIONS는 기존과 동일하게 유지
 # 카테고리 6단계 질문 (원문 그대로 유지)
 PROMPT_VERSIONS = {
     "K-Pop": [
@@ -52,13 +52,11 @@ PROMPT_VERSIONS = {
 def parse_rankings(raw_rankings_text):
     if not raw_rankings_text: return []
     parsed = []
-    # 불필요한 마크다운 기호 제거 후 줄바꿈 단위로 분리
     lines = raw_rankings_text.replace('*', '').strip().split('\n')
     for i, line in enumerate(lines):
         if i >= 10: break
         try:
             line = re.sub(r'\[\d+\]', '', line).strip()
-            # 숫자와 구분 기호 제거 후 제목만 추출
             title = re.sub(r'^\d+[\.\)\s-]*', '', line).strip()
             if title:
                 parsed.append({
@@ -71,16 +69,15 @@ def parse_rankings(raw_rankings_text):
     return parsed
 
 def run_category_process(category, run_count):
-    print(f"\n🚀 [Mission Start] {category} (Cycle Index: {run_count % 6})")
+    print(f"\n🚀 [Debug Mode Active] {category} (Run #{run_count})")
 
     v_idx = run_count % 6
     task = PROMPT_VERSIONS[category][v_idx]
 
-    # [엔지니어링] 태그가 확실히 구별되도록 가이드 수정
     final_prompt = f"""
     실시간 검색을 사용하여 다음 과제를 수행하라: {task}
     
-    결과물은 반드시 아래 태그를 사용하여 구분하라. (다른 설명 금지)
+    결과물은 반드시 아래 태그를 사용하여 구분하라.
     
     ##TARGET_KR## 한국어 이름
     ##TARGET_EN## English Name
@@ -91,35 +88,52 @@ def run_category_process(category, run_count):
     ... 10위까지
     """
 
-    data = gemini_api.ask_gemini_with_search(final_prompt)
+    # gemini_api.ask_gemini_with_search 가 원문을 함께 반환하도록 수정되었다고 가정하거나,
+    # 해당 함수에서 파싱 실패 시 None을 주면 내부에서 raw_text를 로깅해야 합니다.
+    # 여기서는 gemini_api를 수정하여 'raw_text'까지 받아오는 구조로 설명드립니다.
+    
+    data, raw_text = gemini_api.ask_gemini_with_search_debug(final_prompt)
 
-    if not data or not data.get('headline'):
-        print(f"❌ {category} 추출 실패: 태그 파싱 오류")
+    if not data:
+        print(f"❌ {category} 추출 실패! 원문을 DB 'error_logs'에 기록합니다.")
+        # [핵심] 실패 원인 분석을 위해 DB에 raw_text 저장
+        error_data = {
+            "category": category,
+            "run_count": run_count,
+            "raw_response": raw_text if raw_text else "NO RESPONSE FROM AI",
+            "error_message": "Tag parsing failed or safety filter triggered"
+        }
+        database.save_error_log(error_data) # database.py에 이 함수를 추가해야 합니다.
         return
 
-    # 1. 랭킹 처리
-    raw_rankings = data.get('raw_rankings', '')
-    clean_rankings = parse_rankings(raw_rankings)
-    if clean_rankings:
-        database.save_rankings_to_db(clean_rankings)
+    # --- 이하 성공 시 로직 (기존과 동일) ---
+    try:
+        raw_rankings = data.get('raw_rankings', '')
+        clean_rankings = parse_rankings(raw_rankings)
+        if clean_rankings:
+            database.save_rankings_to_db(clean_rankings)
 
-    # 2. 이미지 수집 (타겟 인물 기반)
-    target_kr = data.get("target_kr", "K-Star").strip()
-    target_en = data.get("target_en", "K-Star").strip()
-    print(f"📸 '{target_kr}' 이미지 수집 중...")
-    final_image = naver_api.get_target_image(target_kr)
+        target_kr = data.get("target_kr", "K-Star").strip()
+        target_en = data.get("target_en", "K-Star").strip()
+        final_image = naver_api.get_target_image(target_kr)
 
-    # 3. 뉴스 저장
-    news_items = [{
-        "category": category,
-        "keyword": target_en,
-        "title": data.get("headline"),
-        "summary": data.get("content"),
-        "image_url": final_image,
-        "score": 100,
-        "created_at": datetime.now().isoformat(),
-        "likes": 0
-    }]
-    
-    database.save_news_to_live(news_items)
-    print(f"🎉 성공: {target_en} 뉴스 발행 완료.")
+        news_items = [{
+            "category": category,
+            "keyword": target_en,
+            "title": data.get("headline"),
+            "summary": data.get("content"),
+            "image_url": final_image,
+            "score": 100,
+            "created_at": datetime.now().isoformat(),
+            "likes": 0
+        }]
+        database.save_news_to_live(news_items)
+        print(f"🎉 성공: {target_en} 뉴스 발행 완료.")
+    except Exception as e:
+        print(f"🚨 저장 과정 중 오류: {e}")
+        database.save_error_log({
+            "category": category,
+            "run_count": run_count,
+            "raw_response": str(data),
+            "error_message": f"Save Error: {str(e)}"
+        })
