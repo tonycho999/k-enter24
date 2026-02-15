@@ -2,6 +2,7 @@ import os
 import requests
 import time
 import re
+import random  # 랜덤 시간 생성을 위해 추가
 from dotenv import load_dotenv
 
 load_dotenv(os.path.join(os.path.dirname(__file__), '../.env'))
@@ -14,24 +15,22 @@ def get_best_available_model():
         resp = requests.get(url, timeout=10)
         if resp.status_code == 200:
             models = resp.json().get('models', [])
-            # 1. 최신인 2.0 시리즈 검색
+            # 1. 1.5-flash-latest (무료 티어에서 가장 안정적임)
+            for m in models:
+                if "gemini-1.5-flash-latest" in m['name']:
+                    return m['name']
+            # 2. 최신인 2.0 시리즈
             for m in models:
                 if "gemini-2.0-flash" in m['name'] and 'generateContent' in m.get('supportedGenerationMethods', []):
                     return m['name']
-            # 2. 없으면 1.5 시리즈 검색
-            for m in models:
-                if "gemini-1.5-flash" in m['name'] and 'generateContent' in m.get('supportedGenerationMethods', []):
-                    return m['name']
-            # 3. 그것도 없으면 리스트의 첫 번째 모델 반환
             return models[0]['name']
-        return "models/gemini-1.5-flash" # 실패 시 기본값
+        return "models/gemini-1.5-flash"
     except:
         return "models/gemini-1.5-flash"
 
 def ask_gemini_with_search_debug(prompt):
     if not API_KEY: return None, "API_KEY_MISSING"
 
-    # [핵심] 시스템이 스스로 사용할 모델을 결정합니다.
     model_name = get_best_available_model()
     print(f"🤖 선택된 최적 모델: {model_name}")
     
@@ -44,9 +43,23 @@ def ask_gemini_with_search_debug(prompt):
         "generationConfig": {"temperature": 0.7, "maxOutputTokens": 2048}
     }
 
-    for attempt in range(2):
+    # API 호출 전후에 카테고리 간 간격을 벌리기 위해 main.py나 호출 루프에서 사용할 랜덤 함수
+    def random_sleep():
+        wait_ms = random.randint(60000, 180000) # 60초 ~ 180초 사이의 ms
+        wait_sec = wait_ms / 1000.0
+        print(f"💤 할당량 보호를 위해 {wait_ms}ms ({wait_sec:.2f}초) 동안 휴식합니다...")
+        time.sleep(wait_sec)
+
+    for attempt in range(3): # 시도 횟수를 3회로 증가
         try:
             resp = requests.post(url, headers=headers, json=payload, timeout=120)
+            
+            # 429 에러(할당량 초과) 발생 시 즉시 랜덤 휴식 후 재시도
+            if resp.status_code == 429:
+                print(f"⚠️ 429 에러 감지! 모델: {model_name}")
+                random_sleep()
+                continue
+
             if resp.status_code != 200:
                 return None, f"HTTP_{resp.status_code}: {resp.text} (Model: {model_name})"
 
@@ -72,7 +85,7 @@ def ask_gemini_with_search_debug(prompt):
             return None, raw_text
 
         except Exception as e:
-            time.sleep(5)
             last_err = str(e)
+            random_sleep() # 예외 발생 시에도 휴식
             
     return None, f"EXCEPTION: {last_err}"
