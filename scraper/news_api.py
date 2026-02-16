@@ -6,12 +6,12 @@ from groq import Groq
 
 class NewsEngine:
     def __init__(self):
-        # Perplexity 클라이언트 설정 (OpenAI 인터페이스 호환)
+        # Perplexity (검색 엔진)
         self.pplx = OpenAI(
             api_key=os.environ.get("PERPLEXITY_API_KEY"), 
             base_url="https://api.perplexity.ai"
         )
-        # Groq 클라이언트 설정
+        # Groq (요약 엔진)
         self.groq = Groq(
             api_key=os.environ.get("GROQ_API_KEY")
         )
@@ -35,7 +35,6 @@ class NewsEngine:
 
         반드시 유효한 JSON 포맷으로 출력해.
         """
-
         try:
             response = self.pplx.chat.completions.create(
                 model="sonar-pro",
@@ -43,40 +42,35 @@ class NewsEngine:
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt}
                 ],
-                temperature=0.1  # 정확한 포맷을 위해 낮게 설정
+                temperature=0.1 # JSON 형식을 지키기 위해 창의성 낮춤
             )
             return response.choices[0].message.content, user_prompt
             
         except Exception as e:
-            print(f"Perplexity API 호출 중 오류: {e}")
-            # 오류 발생 시 빈 JSON 문자열과 프롬프트 반환하여 멈춤 방지
-            return json.dumps({"people": [], "top10": []}), user_prompt
+            print(f"Perplexity API Error: {e}")
+            return "{}", user_prompt
 
     def edit_with_groq(self, person_name, news_facts, category):
         """
-        Groq API (Llama 3)를 사용하여 팩트 정보를 바탕으로 기사(제목+본문)를 작성합니다.
+        Groq (Llama 3)을 사용하여 팩트를 기반으로 '클릭을 유도하는 기사' 작성
         """
-        # 카테고리별 페르소나 설정
         personas = {
-            "k-pop": "너는 아이돌 팬덤 용어를 잘 아는 열정적인 K-POP 전문 기자야. 이모지를 적절히 섞어서 생동감 있게 써.",
-            "k-drama": "너는 드라마의 감정선과 시청률 추이를 분석하는 드라마 전문 에디터야.",
-            "k-movie": "너는 영화의 연출과 연기력을 깊이 있게 평론하는 영화 기자야.",
-            "k-entertain": "너는 예능 프로그램의 재미 요소를 콕 집어내는 방송 연예 기자야.",
-            "k-culture": "너는 MZ세대가 좋아하는 핫플레이스와 축제를 소개하는 트렌드 큐레이터야. 연예인은 제외해줘"
+            "k-pop": "K-POP 전문 기자. 팬덤 용어와 이모지를 사용해 생동감 있게.",
+            "k-drama": "드라마 전문 에디터. 감정선과 시청률 분석 위주.",
+            "k-movie": "영화 평론가. 연출과 연기력 분석 위주.",
+            "k-entertain": "연예부 기자. 재미와 화제성 위주.",
+            "k-culture": "라이프스타일 큐레이터. 핫플레이스와 트렌드 소개."
         }
         
-        system_msg = personas.get(category, "너는 한국 엔터테인먼트 전문 기자야.")
+        system_msg = personas.get(category, "한국 엔터테인먼트 전문 기자")
         user_msg = f"""
         주제: {person_name}
         팩트: {news_facts}
 
-        위 정보를 바탕으로 사람들이 클릭하고 싶게 만드는 '기사 제목'과 '본문'을 작성해줘.
-        
-        [조건]
-        1. 제목은 첫 줄에 쓰고, 본문은 둘째 줄부터 써.
-        2. 본문은 3~10문단 정도로 요약해.
-        3. 팩트에 없는 내용은 지어내지 마.
-        4. 영어로 작성해.
+        위 팩트를 바탕으로 다음 형식에 맞춰 기사를 작성해줘:
+        1. 첫 줄: 호기심을 자극하는 제목 (이모지 포함 가능)
+        2. 두 번째 줄부터: 본문 (3문단 내외로 요약)
+        3. 팩트에 없는 내용은 지어내지 말 것.
         """
 
         try:
@@ -88,10 +82,8 @@ class NewsEngine:
                 ],
                 temperature=0.7
             )
-            # 무료 티어 API 속도 제한(Rate Limit) 방지를 위한 대기
-            time.sleep(2) 
+            time.sleep(1.5) # 무료 티어 Rate Limit 고려
             return completion.choices[0].message.content
-            
         except Exception as e:
-            print(f"Groq API 호출 중 오류 ({person_name}): {e}")
-            return f"{person_name} 관련 소식입니다.\n{news_facts}" # 오류 시 기본 팩트 반환
+            print(f"Groq API Error ({person_name}): {e}")
+            return f"{person_name} 소식\n{news_facts}"
