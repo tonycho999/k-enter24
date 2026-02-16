@@ -63,7 +63,6 @@ class NewsEngine:
            - "name_en": Name in English (e.g., "Yoo Jae-suk")
            - "name_kr": Name in Korean (e.g., "유재석") - *Required for image search*
            - "facts": 3 bullet points summarizing why they are trending (in English)
-           - "link": Original Korean news link
         
         2. "top10": Top 10 most popular content in {category}.
            - "rank": 1~10
