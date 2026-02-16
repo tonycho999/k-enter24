@@ -99,6 +99,7 @@ class NewsEngine:
             2. Do not include scandals or person names in top10.
             """
         
+        # 시스템 프롬프트: 소스는 한국어, 출력은 영어
         system_prompt = "You are a K-Entertainment expert. Search ONLY Korean domestic news/charts, but output all JSON values in English."
         
         user_prompt = f"""
@@ -139,35 +140,66 @@ class NewsEngine:
     def edit_with_groq(self, person_name_en, news_facts_en, category):
         """
         [Step 2] Groq: 영어 팩트 -> 영어 기사 작성
+        - 제목 'News about' 금지
+        - 페르소나: Senior Editor
         """
         def _call_api():
-            system_msg = "You are a professional K-Pop journalist for global fans."
+            # 페르소나 설정: 단순 기자가 아닌 수석 에디터
+            system_msg = "You are a Senior Editor at a top Global K-Pop Magazine (like Billboard or Variety)."
+            
             user_msg = f"""
             Topic: {person_name_en}
             Facts: {news_facts_en}
 
             Write a news article **in English**.
-            1. **Headline**: Catchy English headline (1st line).
-            2. **Body**: 3 paragraphs (from 2nd line).
-            3. **Score**: End with "###SCORE: XX" (50-99) based on viral potential.
+
+            [Headline Rules]
+            1. **Format**: Write a catchy, professional headline on the first line.
+            2. ❌ **FORBIDDEN**: Do NOT start with "News about", "Update on", "Report regarding", or the person's name followed by a colon.
+            3. ✅ **Style**: Use active verbs and sensational words (e.g., "Dominates", "Reveals", "Shocks", "Confirms", "Breaks Record").
+            4. **Example**: 
+               - BAD: "News about BTS Jin's military service"
+               - GOOD: "BTS Jin Finally Discharged: Fans Celebrate Worldwide"
+
+            [Body Rules]
+            1. Write 3 paragraphs starting from the 2nd line.
+            2. Use a professional yet engaging tone suitable for global fans.
+            
+            [Score Rule]
+            - At the very end, write "###SCORE: XX" (50-99) based on viral potential.
             """
-            # [변경] 위에서 자동으로 선택한 모델(self.model_id) 사용
+            
+            # 위에서 자동 선택된 최적 모델 사용
             return self.groq.chat.completions.create(
                 model=self.model_id, 
                 messages=[
                     {"role": "system", "content": system_msg},
                     {"role": "user", "content": user_msg}
                 ],
-                temperature=0.7
+                temperature=0.7 
             )
 
+        # 재시도 로직 실행 (기본 5초 대기)
         completion = self._retry_request(_call_api, base_delay=5)
 
         if completion:
-            # Jitter (랜덤 대기)
+            # Jitter (3~5초 랜덤 대기)
             rest_time = random.uniform(3, 5)
             print(f"     -> Resting for {rest_time:.2f}s...")
             time.sleep(rest_time)
-            return completion.choices[0].message.content
+            
+            content = completion.choices[0].message.content
+            
+            # [안전장치] AI가 금지어를 썼을 경우 강제 제거
+            lines = content.split('\n')
+            first_line_lower = lines[0].lower().strip()
+            
+            # "News about"으로 시작하면 제거
+            if first_line_lower.startswith("news about"):
+                lines[0] = lines[0].replace("News about ", "").replace("news about ", "").strip()
+                content = "\n".join(lines)
+            
+            return content
         
-        return f"News about {person_name_en}\n{news_facts_en}\n###SCORE: 50"
+        # 실패 시 백업 메시지
+        return f"{person_name_en}: Latest Updates & Highlights\n{news_facts_en}\n###SCORE: 50"
