@@ -6,16 +6,11 @@ from naver_api import NaverManager
 from database import DatabaseManager
 
 def clean_json_text(text):
-    """AI 응답에서 순수 JSON만 추출"""
     match = re.search(r"```(?:json)?\s*(.*)\s*```", text, re.DOTALL)
-    if match:
-        text = match.group(1)
-    
+    if match: text = match.group(1)
     start = text.find('{')
     end = text.rfind('}')
-    
-    if start != -1 and end != -1:
-        return text[start:end+1]
+    if start != -1 and end != -1: return text[start:end+1]
     return text.strip()
 
 def run_automation():
@@ -26,13 +21,12 @@ def run_automation():
     naver = NaverManager()
     
     run_count = int(os.environ.get("RUN_COUNT", 0))
-    
     categories = ["k-pop", "k-drama", "k-movie", "k-entertain", "k-culture"]
 
     for cat in categories:
         print(f"\n[{cat}] Processing...")
         try:
-            # 1. Perplexity: 한국어로 데이터 수집 (정확도 최우선)
+            # 1. Perplexity: 한국 소스 검색 -> 영어 JSON 반환
             raw_data_str, original_query = engine.get_trends_and_rankings(cat)
             
             cleaned_str = clean_json_text(raw_data_str)
@@ -43,69 +37,65 @@ def run_automation():
             parsed_data = json.loads(cleaned_str)
             
             # ---------------------------------------------------
-            # A. [사이드바] TOP 10 랭킹 (한국어 -> 영어 번역 후 저장)
+            # A. [사이드바] TOP 10 랭킹 (영어)
             # ---------------------------------------------------
-            korean_top10 = parsed_data.get('top10', [])
-            if korean_top10:
-                print(f"  > Translating {len(korean_top10)} Rankings to English...")
-                
-                # [핵심] Groq을 이용해 리스트 일괄 번역
-                english_top10 = engine.translate_top10_to_english(korean_top10)
-                
-                for item in english_top10:
+            top10_list = parsed_data.get('top10', [])
+            if top10_list:
+                print(f"  > Saving {len(top10_list)} Rankings...")
+                for item in top10_list:
                     db.save_rankings([{
                         "category": cat,
                         "rank": item.get('rank'),
-                        "title": item.get('title'), # 이제 영어 제목임
-                        "meta_info": item.get('info', ''), # 이제 영어 설명임
+                        "title": item.get('title'),
+                        "meta_info": item.get('info', ''),
                         "score": 0
                     }])
 
             # ---------------------------------------------------
-            # B. [메인 피드] 인물 뉴스 (한국어 팩트 -> 영어 기사 작성)
+            # B. [메인 피드] 기사 작성
             # ---------------------------------------------------
             people_list = parsed_data.get('people', [])
             if people_list:
-                print(f"  > Processing {len(people_list)} People Articles...")
+                print(f"  > Processing {len(people_list)} Articles...")
                 
                 for person in people_list:
-                    name_kr = person.get('name')
-                    facts_kr = person.get('facts')
+                    name_en = person.get('name_en') # 영어 이름 (DB 저장용)
+                    name_kr = person.get('name_kr') # 한국어 이름 (이미지 검색용)
+                    facts = person.get('facts')     # 영어 팩트
                     
-                    if not name_kr: continue
+                    # 둘 중 하나라도 없으면 대체
+                    if not name_en: name_en = name_kr 
+                    if not name_kr: name_kr = name_en
+                    
+                    if not name_en: continue
 
-                    # Groq: 한국어 팩트를 읽고 영어 기사 + 점수 생성
-                    full_text = engine.edit_with_groq(name_kr, facts_kr, cat)
+                    # Groq: 영어 팩트로 영어 기사 작성
+                    full_text = engine.edit_with_groq(name_en, facts, cat)
                     
                     # 점수 파싱
                     score = 70
                     final_text = full_text
-                    
                     if "###SCORE:" in full_text:
                         try:
                             parts = full_text.split("###SCORE:")
                             final_text = parts[0].strip()
+                            import re
                             score_match = re.search(r'\d+', parts[1])
-                            if score_match:
-                                score = int(score_match.group())
-                        except:
-                            pass
+                            if score_match: score = int(score_match.group())
+                        except: pass
 
-                    # 제목/본문 분리
                     lines = final_text.split('\n')
-                    raw_title = lines[0]
-                    title = re.sub(r'^(Headline:|Title:)\s*', '', raw_title, flags=re.IGNORECASE).strip()
+                    title = lines[0].replace('Headline:', '').strip()
                     summary = "\n".join(lines[1:]).strip()
                     
-                    # 네이버 이미지 검색 (한국어 이름으로 검색해야 정확함)
+                    # [핵심] 이미지는 '한국어 이름'으로 검색해야 정확함
                     img_url = naver.get_image(name_kr)
                     
-                    # 아카이브 저장 (영어 데이터)
                     article_data = {
                         "category": cat,
-                        "keyword": name_kr, # 검색용 키워드는 한국어로 남겨둘 수도, 영어로 바꿀 수도 있음. 여기선 원본 유지.
-                        "title": title,     # 영어 제목
-                        "summary": summary, # 영어 본문
+                        "keyword": name_en, # DB엔 영어 이름
+                        "title": title,
+                        "summary": summary,
                         "link": person.get('link', ''),
                         "image_url": img_url,
                         "score": score,
@@ -114,9 +104,9 @@ def run_automation():
                         "raw_result": str(person),
                         "run_count": run_count 
                     }
+                    
                     db.save_to_archive(article_data)
                     
-                    # 라이브 뉴스 저장
                     live_data = {
                         "category": article_data['category'],
                         "keyword": article_data['keyword'],
@@ -128,12 +118,10 @@ def run_automation():
                         "likes": 0
                     }
                     db.save_live_news([live_data])
-                    print(f"    - Published: {title[:30]}... (Score: {score})")
+                    print(f"    - Published: {name_en} (Score: {score})")
 
-        except json.JSONDecodeError:
-            print(f"❌ [{cat}] JSON Parsing Error.")
         except Exception as e:
-            print(f"❌ [{cat}] Unknown Error: {e}")
+            print(f"❌ [{cat}] Error: {e}")
 
 if __name__ == "__main__":
     run_automation()
