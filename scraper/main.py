@@ -1,9 +1,19 @@
 import json
 import re
 import os
+import time
 from news_api import NewsEngine
 from naver_api import NaverManager
 from database import DatabaseManager
+from supabase import create_client
+
+# ---------------------------------------------------------
+# [설정] 카운터 기반 스케줄링 (0 ~ 23 사이클)
+# ---------------------------------------------------------
+# K-Pop: 매번 실행 (조건 없음)
+# 그 외 카테고리: 아래 리스트에 있는 '순서'에만 실행
+# (예: 5번째 실행일 때, 17번째 실행일 때)
+TARGET_COUNTS_FOR_OTHERS = [5, 17] 
 
 def clean_json_text(text):
     match = re.search(r"```(?:json)?\s*(.*)\s*```", text, re.DOTALL)
@@ -13,20 +23,75 @@ def clean_json_text(text):
     if start != -1 and end != -1: return text[start:end+1]
     return text.strip()
 
+# ---------------------------------------------------------
+# [DB 연동] 실행 카운트 관리 함수
+# ---------------------------------------------------------
+# system_status 테이블에서 카운트를 가져오고 업데이트합니다.
+supa_url = os.environ.get("SUPABASE_URL")
+supa_key = os.environ.get("SUPABASE_KEY")
+supabase = create_client(supa_url, supa_key)
+
+def get_run_count():
+    """DB에서 현재 run_count 가져오기 (기본값 0)"""
+    try:
+        res = supabase.from('system_status').select('run_count').eq('id', 1).single()
+        if res.data:
+            return res.data['run_count']
+        return 0
+    except:
+        return 0
+
+def update_run_count(current):
+    """
+    실행이 끝나면 카운트를 1 올림
+    23에서 1 올리면 0으로 초기화 (0~23 루프)
+    """
+    next_count = current + 1
+    if next_count >= 24:
+        next_count = 0
+    
+    try:
+        supabase.from('system_status').upsert({'id': 1, 'run_count': next_count}).execute()
+        print(f"🔄 Cycle Count Updated: {current} -> {next_count}")
+    except Exception as e:
+        print(f"⚠️ Failed to update run count: {e}")
+
+def is_target_run(category, run_count):
+    """실행 여부 결정"""
+    # 1. K-POP: 무조건 실행 (가장 중요)
+    if category == 'k-pop':
+        return True
+        
+    # 2. 나머지: 지정된 순서(5, 17)일 때만 실행
+    if run_count in TARGET_COUNTS_FOR_OTHERS:
+        return True
+        
+    print(f"  ⏭️ [Skip] {category} (Current Count: {run_count})")
+    return False
+
+# ---------------------------------------------------------
+# [메인 로직]
+# ---------------------------------------------------------
 def run_automation():
-    print("🚀 K-Enter24 Automation Started (KR Search -> EN Save)")
+    # 1. DB에서 '이번엔 몇 번째 순서인지' 확인
+    run_count = get_run_count()
+    print(f"🚀 Automation Started (Cycle: {run_count}/23)")
     
     db = DatabaseManager()
     engine = NewsEngine()
     naver = NaverManager()
     
-    run_count = int(os.environ.get("RUN_COUNT", 0))
     categories = ["k-pop", "k-drama", "k-movie", "k-entertain", "k-culture"]
 
     for cat in categories:
+        # 실행할 순서가 아니면 스킵
+        if not is_target_run(cat, run_count):
+            continue
+            
         print(f"\n[{cat}] Processing...")
+
         try:
-            # 1. Perplexity: 한국 소스 검색 -> 영어 JSON 반환
+            # 1. 데이터 수집 (한국어 검색 -> 영어 JSON)
             raw_data_str, original_query = engine.get_trends_and_rankings(cat)
             
             cleaned_str = clean_json_text(raw_data_str)
@@ -36,9 +101,7 @@ def run_automation():
 
             parsed_data = json.loads(cleaned_str)
             
-            # ---------------------------------------------------
-            # A. [사이드바] TOP 10 랭킹 (영어)
-            # ---------------------------------------------------
+            # A. 랭킹 저장
             top10_list = parsed_data.get('top10', [])
             if top10_list:
                 print(f"  > Saving {len(top10_list)} Rankings...")
@@ -51,25 +114,22 @@ def run_automation():
                         "score": 0
                     }])
 
-            # ---------------------------------------------------
-            # B. [메인 피드] 기사 작성
-            # ---------------------------------------------------
+            # B. 기사 작성
             people_list = parsed_data.get('people', [])
             if people_list:
                 print(f"  > Processing {len(people_list)} Articles...")
                 
                 for person in people_list:
-                    name_en = person.get('name_en') # 영어 이름 (DB 저장용)
-                    name_kr = person.get('name_kr') # 한국어 이름 (이미지 검색용)
-                    facts = person.get('facts')     # 영어 팩트
+                    name_en = person.get('name_en')
+                    name_kr = person.get('name_kr')
+                    facts = person.get('facts')
                     
-                    # 둘 중 하나라도 없으면 대체
                     if not name_en: name_en = name_kr 
                     if not name_kr: name_kr = name_en
                     
                     if not name_en: continue
 
-                    # Groq: 영어 팩트로 영어 기사 작성
+                    # Groq 기사 생성
                     full_text = engine.edit_with_groq(name_en, facts, cat)
                     
                     # 점수 파싱
@@ -88,12 +148,12 @@ def run_automation():
                     title = lines[0].replace('Headline:', '').strip()
                     summary = "\n".join(lines[1:]).strip()
                     
-                    # [핵심] 이미지는 '한국어 이름'으로 검색해야 정확함
+                    # 이미지 검색
                     img_url = naver.get_image(name_kr)
                     
                     article_data = {
                         "category": cat,
-                        "keyword": name_en, # DB엔 영어 이름
+                        "keyword": name_en,
                         "title": title,
                         "summary": summary,
                         "link": person.get('link', ''),
@@ -122,6 +182,9 @@ def run_automation():
 
         except Exception as e:
             print(f"❌ [{cat}] Error: {e}")
+
+    # 2. 모든 작업이 끝나면 다음 순서를 위해 카운트 +1
+    update_run_count(run_count)
 
 if __name__ == "__main__":
     run_automation()
