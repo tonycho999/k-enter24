@@ -4,13 +4,13 @@ import { useEffect, useState, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { 
   User, LogOut, ChevronDown, 
-  Sun, Moon, Languages, Search, X, ExternalLink 
+  Languages, Search, X, ExternalLink 
 } from 'lucide-react';
 
 export default function Header() {
   const [user, setUser] = useState<any>(null);
   const [menuOpen, setMenuOpen] = useState(false);
-  const [isDark, setIsDark] = useState(false);
+  // [삭제됨] 다크모드 상태 const [isDark, setIsDark] = useState(false);
   const [langCode, setLangCode] = useState('EN'); 
   const [totalCount, setTotalCount] = useState(0);
 
@@ -24,11 +24,12 @@ export default function Header() {
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setUser(data.user));
     
+    // [수정] 다크모드 버튼은 삭제했지만, 시스템 설정에 따라 화면을 어둡게 할지 여부는 유지합니다.
+    // (원치 않으시면 이 블록 전체를 삭제하셔도 됩니다)
     const savedTheme = localStorage.getItem('theme');
     const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
     
     if (savedTheme === 'dark' || (!savedTheme && prefersDark)) {
-      setIsDark(true);
       document.documentElement.classList.add('dark');
     }
 
@@ -62,7 +63,6 @@ export default function Header() {
   }, [isSearchOpen]);
 
   // [핵심] 실시간 검색 로직 (디바운싱 적용)
-  // 사용자가 타자를 칠 때는 기다리다가, 300ms(0.3초) 동안 입력이 없으면 검색 실행
   useEffect(() => {
     const delayDebounceFn = setTimeout(async () => {
       if (!searchQuery.trim()) {
@@ -99,7 +99,6 @@ export default function Header() {
       }
     }, 300); // 0.3초 지연
 
-    // 타자를 계속 치면 이전 타이머를 취소해서 DB 호출을 막음
     return () => clearTimeout(delayDebounceFn);
   }, [searchQuery]);
 
@@ -108,17 +107,7 @@ export default function Header() {
     e.preventDefault();
   };
 
-  const toggleDarkMode = () => {
-    const newDark = !isDark;
-    setIsDark(newDark);
-    if (newDark) {
-      document.documentElement.classList.add('dark');
-      localStorage.setItem('theme', 'dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-      localStorage.setItem('theme', 'light');
-    }
-  };
+  // [삭제됨] toggleDarkMode 함수 삭제
 
   const handleAiTranslate = () => {
     window.dispatchEvent(new CustomEvent('ai-translate', { detail: langCode }));
@@ -145,7 +134,7 @@ export default function Header() {
           </div>
           
           <div className="flex flex-col ml-1 sm:ml-2 border-l border-slate-200 dark:border-slate-700 pl-2 sm:pl-3">
-               <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-1.5">
                   <span className="relative flex h-2.5 w-2.5">
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
                     <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-cyan-500"></span>
@@ -166,12 +155,7 @@ export default function Header() {
             <Search size={22} />
           </button>
 
-          <button 
-            onClick={(e) => { e.preventDefault(); toggleDarkMode(); }} 
-            className="p-2.5 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400 transition-colors"
-          >
-            {isDark ? <Sun size={22} className="text-yellow-500" /> : <Moon size={22} />}
-          </button>
+          {/* [삭제됨] 해/달 버튼 위치였던 곳 */}
 
           <button 
             onClick={(e) => { e.preventDefault(); handleAiTranslate(); }}
@@ -212,7 +196,7 @@ export default function Header() {
         <div className="fixed inset-0 z-[9999] bg-black/60 backdrop-blur-sm flex items-start justify-center pt-20 px-4">
           <div className="w-full max-w-2xl bg-white dark:bg-slate-900 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[80vh]">
             
-            {/* 검색 입력창 (onSubmit 수정됨) */}
+            {/* 검색 입력창 */}
             <form onSubmit={handleSearchSubmit} className="flex items-center p-4 border-b border-slate-100 dark:border-slate-800">
               <Search className="text-slate-400 mr-3" size={24} />
               <input 
@@ -238,8 +222,7 @@ export default function Header() {
                     <div 
                       key={item.id} 
                       onClick={() => {
-                        setIsSearchOpen(false); // 검색창 닫기
-                        // 메인 페이지에 모달 열라고 신호 보내기
+                        setIsSearchOpen(false); 
                         window.dispatchEvent(new CustomEvent('open-news-modal', { detail: item }));
                       }}
                       className="block p-4 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group cursor-pointer"
