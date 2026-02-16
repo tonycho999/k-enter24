@@ -24,10 +24,8 @@ export default function Sidebar({ news, category }: SidebarProps) {
       try {
         let data: RankingItemData[] | null = null;
         
-        // ✅ [수정] 불필요한 이름 변환 로직 삭제!
-        // 이제 DB에도 'K-Entertain'으로 저장되므로 그대로 요청하면 됩니다.
-        
         if (category === 'All') {
+          // 전체보기일 때는 'score' 높은 순으로 섞어서 보여줌
           const { data: trendingData, error } = await supabase
             .from('live_rankings') 
             .select('*')
@@ -43,10 +41,13 @@ export default function Sidebar({ news, category }: SidebarProps) {
             })) as RankingItemData[];
           }
         } else {
+          // ✅ [핵심 수정] DB에는 'k-pop'처럼 소문자로 저장되어 있으므로 변환 필수!
+          const dbCategory = category.toLowerCase();
+
           const { data: categoryData, error } = await supabase
             .from('live_rankings')
             .select('*')
-            .eq('category', category) // ✅ 변환 없이 있는 그대로 요청 (K-Entertain)
+            .eq('category', dbCategory) // 소문자로 변환된 값 사용
             .order('rank', { ascending: true })
             .limit(10);
             
