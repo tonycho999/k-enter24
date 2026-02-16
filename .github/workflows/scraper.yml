@@ -1,11 +1,9 @@
 name: K-Enter 24 Auto Scraper
 
 on:
-  # 매시간 실행하고 싶다면 아래 주석을 해제하세요. (무료 Groq 티어 고려 시 권장)
   # schedule:
   #   - cron: '11 * * * *'
-  
-  workflow_dispatch: # 수동 실행 버튼 활성화
+  workflow_dispatch:
 
 jobs:
   build:
@@ -22,21 +20,18 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
+          # requirements.txt에 supabase, openai, groq, requests가 반드시 포함되어야 합니다.
           pip install -r scraper/requirements.txt
 
       - name: Run Scraper
         env:
-          # Supabase: 데이터 입력을 위해 SERVICE_ROLE_KEY 사용 권장
+          # 코드가 os.environ.get("...")으로 읽는 이름과 정확히 일치해야 합니다.
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-          
-          # AI & Search APIs
           PERPLEXITY_API_KEY: ${{ secrets.PERPLEXITY_API_KEY }}
-          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }} # 신규 추가
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           NAVER_CLIENT_ID: ${{ secrets.NAVER_CLIENT_ID }}
           NAVER_CLIENT_SECRET: ${{ secrets.NAVER_CLIENT_SECRET }}
-          
-          # 기타 설정
           RUN_COUNT: ${{ github.run_number }}
         run: |
           cd scraper
