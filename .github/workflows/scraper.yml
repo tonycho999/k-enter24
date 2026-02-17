@@ -1,10 +1,9 @@
-name: K-Enter 24 Auto Scraper
+name: K-Enter 24 Auto Scraper (Bot Mode)
 
 on:
+  workflow_dispatch: # 수동 실행 버튼
 #  schedule:
-#    - cron: '11 * * * *' # Executes at minute 11 of every hour
-  
-  workflow_dispatch: # Manual run button
+#    - cron: '11 * * * *' # 매시간 11분에 실행
 
 jobs:
   build:
@@ -22,33 +21,16 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r scraper/requirements.txt
+          # [핵심] 봇 실행을 위한 브라우저 설치
+          playwright install chromium
 
       - name: Run Scraper
         env:
-          # [CRITICAL FIX] Mapping real Secret names to what Python expects
           SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
-          
-          # Perplexity API Key
-          PERPLEXITY_API_KEY: ${{ secrets.PERPLEXITY_API_KEY }}
-          
-          # Groq Multi-Key Rotation
-          GROQ_API_KEY1: ${{ secrets.GROQ_API_KEY1 }}
-          GROQ_API_KEY2: ${{ secrets.GROQ_API_KEY2 }}
-          GROQ_API_KEY3: ${{ secrets.GROQ_API_KEY3 }}
-          GROQ_API_KEY4: ${{ secrets.GROQ_API_KEY4 }}
-          GROQ_API_KEY5: ${{ secrets.GROQ_API_KEY5 }}
-          GROQ_API_KEY6: ${{ secrets.GROQ_API_KEY6 }}
-          GROQ_API_KEY7: ${{ secrets.GROQ_API_KEY7 }}
-          GROQ_API_KEY8: ${{ secrets.GROQ_API_KEY8 }}
-          
-          # Naver API Keys
           NAVER_CLIENT_ID: ${{ secrets.NAVER_CLIENT_ID }}
           NAVER_CLIENT_SECRET: ${{ secrets.NAVER_CLIENT_SECRET }}
-          
-          # Run count for logs
           RUN_COUNT: ${{ github.run_number }}
-        
         run: |
           cd scraper
           python main.py
