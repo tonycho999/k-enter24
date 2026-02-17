@@ -26,32 +26,25 @@ supa_key = os.environ.get("SUPABASE_KEY")
 supabase = create_client(supa_url, supa_key) if supa_url and supa_key else None
 
 def get_run_count():
-    """
-    이미지의 system_status 테이블에서 현재 실행 번호를 가져옵니다.
-    """
     if not supabase: return 0
     try:
-        # id가 1인 row의 run_count를 가져옴
+        # system_status 테이블에서 run_count 가져오기
         res = supabase.table('system_status').select('run_count').eq('id', 1).single().execute()
         return res.data['run_count'] if res.data else 0
     except:
-        # 테이블이 비어있거나 에러나면 0부터 시작
         return 0
 
 def update_run_count(current):
-    """
-    작업 완료 후 실행 번호를 +1 업데이트합니다 (0~23 사이 순환).
-    """
     if not supabase: return
     next_count = current + 1
-    if next_count >= 24: next_count = 0  # 24가 되면 다시 0으로 초기화
+    if next_count >= 24: next_count = 0
     try:
         supabase.table('system_status').upsert({'id': 1, 'run_count': next_count}).execute()
         print(f"🔄 Cycle Count Updated: {current} -> {next_count}")
     except Exception as e:
         print(f"⚠️ Failed to update run count: {e}")
 
-# 순위 변동 체크용 (이전 랭킹 로딩)
+# 순위 변동 체크용
 def get_previous_rank_map(category):
     if not supabase: return {}
     try:
@@ -77,15 +70,14 @@ def get_previous_rank_map(category):
 # [메인 실행 함수]
 # ---------------------------------------------------------
 def run_automation():
-    # 1. 현재 몇 번째 실행인지 확인 (DB에서 로드)
     run_count = get_run_count()
     print(f"🚀 Automation Started (Cycle: {run_count}/23)")
     
     db = DatabaseManager()
-    engine = NewsEngine(run_count)  # run_count에 따라 API 키를 바꿔서 엔진 시작
+    engine = NewsEngine(run_count)
     naver = NaverManager()
     
-    # K-Pop의 경우에만 차트를 갱신할지 결정 (옵션)
+    # API 키 전략 (K-Pop 등 차트 갱신 여부)
     is_key1 = engine.is_using_primary_key() 
     
     categories = ["k-pop", "k-drama", "k-movie", "k-entertain", "k-culture"]
@@ -94,6 +86,7 @@ def run_automation():
         print(f"\n[{cat}] Starting Analysis...")
         
         # [Phase 1] Top 10 차트 조사 및 저장
+        # live_rankings 테이블에 저장
         should_update_chart = (cat == 'k-pop') or is_key1
         if should_update_chart:
             try:
@@ -136,7 +129,7 @@ def run_automation():
                 live_news_buffer = []
 
                 for person in people_list:
-                    # [필터 1] 목표 인원(10명) 채웠으면 해당 카테고리 종료
+                    # [필터] 10명 채우면 중단
                     if len(live_news_buffer) >= TARGET_COUNTS:
                         print("  > ✅ Target count (10) reached. Stopping loop.")
                         break
@@ -148,11 +141,11 @@ def run_automation():
                     
                     if not name_en or not rank: continue
 
-                    # [필터 2] 쿨타임 체크 (DB 확인 - 최근에 작성했으면 패스)
+                    # [쿨타임 체크]
                     if engine.is_in_cooldown(name_en):
                         continue
 
-                    # [로직] 기사 작성 대상 선정 (Top 3 or 순위 변동 or 신규 진입)
+                    # [작성 조건]
                     should_write = False
                     reason = ""
                     if rank <= 3:
@@ -165,17 +158,16 @@ def run_automation():
                     if should_write:
                         print(f"    -> 📝 Processing #{rank} {name_en} ({reason})...")
                         
-                        # (A) 기사 팩트 수집 (여기서 네이버 뉴스 유무도 내부적으로 체크됨)
+                        # (A) 기사 팩트 수집
                         facts = engine.fetch_article_details(name_kr, name_en, cat, rank)
                         
-                        # [필터 3] 뉴스가 없으면 스킵
                         if "NO NEWS FOUND" in facts or "Failed" in facts:
                             continue
 
-                        # (B) Groq AI로 기사 작성
+                        # (B) 기사 작성
                         full_text = engine.edit_with_groq(name_en, facts, cat)
                         
-                        # (C) 점수 파싱 (기본 70점)
+                        # (C) 점수 파싱
                         score = 70
                         if "###SCORE:" in full_text:
                             try:
@@ -185,41 +177,45 @@ def run_automation():
                                 if m: score = int(m.group())
                             except: pass
 
-                        # (D) 제목/본문 분리
                         lines = full_text.split('\n')
                         title = lines[0].replace('Headline:', '').strip()
                         summary = "\n".join(lines[1:]).strip()
 
-                        # (E) DB 저장용 데이터 생성
-                        # ★★★ 중요: 여기서 run_count를 넣지 않습니다 (live_news 테이블에 없으므로) ★★★
-                        article_data = {
+                        # -------------------------------------------------------
+                        # [핵심 수정 구간] 데이터 분리 (Live News vs Archive)
+                        # -------------------------------------------------------
+                        
+                        # 1. Live News용 데이터 (run_count 없음!)
+                        live_data = {
                             "category": cat,
                             "keyword": name_en,
                             "title": title,
                             "summary": summary,
-                            "image_url": naver.get_image(name_kr), # 네이버 이미지 검색
+                            "image_url": naver.get_image(name_kr),
                             "score": score,
                             "likes": 0,
-                            # "run_count": run_count  <-- [삭제됨] 에러 방지용
+                            # "link": "" # 필요시 추가
                         }
-                        
-                        # 아카이브용 데이터 (여기엔 run_count나 query 정보를 넣고 싶다면 별도로 구성 가능)
-                        archive_data = article_data.copy()
-                        archive_data["query"] = f"{cat} top 30 rank {rank}"
-                        # archive_data["run_count"] = run_count # search_archive 테이블에 컬럼이 있다면 주석 해제
 
-                        # 실제 DB 저장 (Archive는 7일치 보관)
+                        # 2. Archive용 데이터 (Live 데이터 복사 후 run_count 추가)
+                        archive_data = live_data.copy()
+                        archive_data["query"] = f"{cat} top 30 rank {rank}"
+                        archive_data["run_count"] = run_count # search_archive에는 이 칸이 있으므로 추가
+                        archive_data["raw_result"] = str(person) # raw_result도 archive에만 있다면 여기에
+
+                        # DB 저장 실행
+                        # (1) 아카이브 저장
                         db.save_to_archive(archive_data)
                         
-                        # 라이브 뉴스 버퍼 추가 (Live는 최신 50개 유지)
-                        live_news_buffer.append(article_data)
+                        # (2) 라이브 뉴스 버퍼에 추가 (나중에 한꺼번에 저장)
+                        live_news_buffer.append(live_data)
                         
-                        # [중요] 작성 성공했으므로 쿨타임 DB에 기록! (중복 작성 방지)
+                        # (3) 쿨타임 기록
                         engine.update_history(name_en, cat)
                         
                         time.sleep(1)
 
-                # 한 카테고리 루프가 끝나면 모인 기사들을 한 번에 Live News에 저장
+                # Loop 종료 후, 모아둔 Live News 일괄 저장
                 if live_news_buffer:
                     print(f"  > 💾 Saving {len(live_news_buffer)} articles to Live News...")
                     db.save_live_news(live_news_buffer)
@@ -229,7 +225,6 @@ def run_automation():
         except Exception as e:
             print(f"  > ❌ Phase 2 Error: {e}")
 
-    # 모든 카테고리 작업이 끝나면 Run Count 업데이트 (+1)
     update_run_count(run_count)
 
 if __name__ == "__main__":
