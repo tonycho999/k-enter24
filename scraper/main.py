@@ -2,7 +2,7 @@ import json
 import re
 import os
 import time
-from news_api import NewsEngine
+from news_api import NewsAutomationSystem
 from chart_api import ChartEngine
 from naver_api import NaverManager
 from database import DatabaseManager
