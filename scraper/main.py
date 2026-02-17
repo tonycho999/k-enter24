@@ -40,7 +40,7 @@ def update_run_count(current):
     except Exception as e:
         print(f"⚠️ Failed to update run count: {e}")
 
-# 순위 변동 체크용 (이전 기록 로드)
+# 순위 변동 체크용
 def get_previous_rank_map(category):
     if not supabase: return {}
     try:
@@ -80,15 +80,15 @@ def run_automation():
         print(f"\n[{cat}] Starting Analysis...")
         
         # =========================================================
-        # [Phase 1] Top 10 차트 조사 및 저장 (완전 분리)
+        # [Phase 1] Top 10 차트 조사 및 저장
         # =========================================================
-        # 실행 조건: K-POP(매시간) OR Key 1번(다른 카테고리)
         should_update_chart = (cat == 'k-pop') or is_key1
         
         if should_update_chart:
             try:
                 chart_json = engine.get_top10_chart(cat)
                 cleaned_chart = clean_json_text(chart_json)
+                
                 if cleaned_chart and cleaned_chart != "{}":
                     parsed_chart = json.loads(cleaned_chart)
                     top10_list = parsed_chart.get('top10', [])
@@ -108,18 +108,15 @@ def run_automation():
                     else:
                         print("  > ⚠️ Top 10 list is empty.")
             except Exception as e:
-                print(f"  > ❌ Phase 1 Error (Chart): {e}")
+                print(f"  > ❌ Phase 1 Error: {e}")
         else:
-            print("  > ⏩ Phase 1 Skipped (Chart update not required).")
+            print("  > ⏩ Phase 1 Skipped.")
 
         # =========================================================
-        # [Phase 2] Top 30 인물 뉴스 조사 (Phase 1 완료 후 실행)
+        # [Phase 2] Top 30 인물 뉴스 조사 (네이버 뉴스만)
         # =========================================================
         try:
-            # 1. 이전 순위 로드
             prev_ranks = get_previous_rank_map(cat)
-            
-            # 2. Top 30 명단 확보
             people_json = engine.get_top30_people(cat)
             cleaned_people = clean_json_text(people_json)
             
@@ -131,7 +128,7 @@ def run_automation():
             people_list = parsed_people.get('people', [])
             
             if people_list:
-                print(f"  > 👥 Analyzing {len(people_list)} People for Article Generation...")
+                print(f"  > 👥 Analyzing {len(people_list)} People (Naver News Check)...")
                 live_news_buffer = []
 
                 for person in people_list:
@@ -142,36 +139,40 @@ def run_automation():
                     if not name_en or not rank: continue
                     if not name_kr: name_kr = name_en
                     
-                    # [업데이트 로직 적용]
-                    # 1위~3위: 무조건 (Always Update)
-                    # 4위~30위: 순위 변동(Change) or 신규 진입(New)
-                    
+                    # [업데이트 로직]
                     should_write = False
                     reason = ""
                     
                     if rank <= 3:
                         should_write = True
-                        reason = "🔥 Top 3 (Auto)"
+                        reason = "🔥 Top 3"
                     elif name_en not in prev_ranks:
                         should_write = True
                         reason = "✨ New Entry"
-                    elif prev_ranks[name_en] != rank:
+                    elif prev_ranks.get(name_en) != rank:
                         should_write = True
                         reason = "📈 Rank Change"
                     
                     if should_write:
-                        print(f"    -> 📝 Processing #{rank} {name_en} ({reason})...")
+                        print(f"    -> 📝 Checking #{rank} {name_en} ({reason})...")
                         
-                        # (A) 기사 팩트 수집 (4/3/2개 규칙 적용됨)
+                        # (A) 기사 팩트 수집 (Naver News Only)
                         facts = engine.fetch_article_details(name_kr, name_en, cat, rank)
-                        if "Failed" in facts:
-                            print("       ⚠️ Skip: Facts failed.")
+                        
+                        # [검증] 뉴스가 없으면 스킵 (Empty/Failed/No News Check)
+                        if (
+                            "Failed" in facts 
+                            or "NO NEWS FOUND" in facts 
+                            or "no results" in facts.lower() 
+                            or len(facts) < 30
+                        ):
+                            print(f"       🚫 Skip: No official news for {name_en}.")
                             continue
 
                         # (B) Groq 기사 작성
                         full_text = engine.edit_with_groq(name_en, facts, cat)
                         
-                        # (C) 점수 및 내용 파싱
+                        # (C) 파싱 및 저장 준비
                         score = 70
                         if "###SCORE:" in full_text:
                             try:
@@ -201,10 +202,8 @@ def run_automation():
                             "run_count": run_count
                         }
                         
-                        # (D) 아카이브 저장
                         db.save_to_archive(article_data)
                         
-                        # (E) 라이브 뉴스 버퍼 추가
                         live_news_buffer.append({
                             "category": article_data['category'],
                             "keyword": article_data['keyword'],
@@ -217,17 +216,16 @@ def run_automation():
                         })
                         time.sleep(1) 
                     else:
-                        pass # 변동 없음
+                        pass 
 
-                # 배치 저장
                 if live_news_buffer:
                     print(f"  > 💾 Saving {len(live_news_buffer)} articles to Live News...")
                     db.save_live_news(live_news_buffer)
                 else:
-                    print("  > 💤 No rank changes. No new articles.")
+                    print("  > 💤 No valid news found or no rank changes.")
 
         except Exception as e:
-            print(f"  > ❌ Phase 2 Error (People): {e}")
+            print(f"  > ❌ Phase 2 Error: {e}")
 
     update_run_count(run_count)
 
