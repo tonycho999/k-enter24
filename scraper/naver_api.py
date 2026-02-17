@@ -19,7 +19,7 @@ class NewsEngine:
         return self.run_count == 0
 
     # ---------------------------------------------------------
-    # [설정] 카테고리별 검색 타겟
+    # [설정] 카테고리별 검색 타겟 (한국어)
     # ---------------------------------------------------------
     def _get_target_description(self, category):
         mapping = {
@@ -35,8 +35,6 @@ class NewsEngine:
     # [유틸] 한국 시간(KST) 구하기 (UTC+9 강제 적용)
     # ---------------------------------------------------------
     def _get_korean_time_str(self):
-        # 서버 시간이 몇 시든 상관없이, 강제로 UTC를 구해 9시간을 더합니다.
-        # 이것이 '진짜 한국 시간'입니다.
         utc_now = datetime.utcnow()
         kst_now = utc_now + timedelta(hours=9)
         return kst_now.strftime("%Y년 %m월 %d일 %H시 %M분")
@@ -56,7 +54,7 @@ class NewsEngine:
             return {}
 
     # ---------------------------------------------------------
-    # [Step 1] Top 10 차트 (한국 시간 기준 24시간 이내)
+    # [Step 1] Top 10 차트 (검색어 한국어 강제)
     # ---------------------------------------------------------
     def get_top10_chart(self, category):
         current_time_str = self._get_korean_time_str()
@@ -70,8 +68,9 @@ class NewsEngine:
             f"Current KST Time: {current_time_str}. "
             f"Source: ONLY site:news.naver.com. "
             f"Target: Find Top 10 trending '{target_desc}' based on news coverage volume. "
+            # [추가됨] 검색어는 무조건 한국어로 하라는 명령
+            "SEARCH INSTRUCTION: Use KOREAN keywords (한국어 검색어) to search on Naver. Do NOT search in English. "
             "STRICT CONSTRAINT: Only include news published within the LAST 24 HOURS from the Current KST Time. "
-            "Do NOT include older news. "
             "Output Requirement: Return titles and names in KOREAN (한국어). "
             "Return ONLY valid JSON. "
             "Format: {'top10': [{'rank': 1, 'title': '한국어 제목/이름', 'info': '이유', 'score': 95}]}"
@@ -82,7 +81,7 @@ class NewsEngine:
         return json.dumps(parsed_json)
 
     # ---------------------------------------------------------
-    # [Step 2] 인물 30인 리스트 (한국 시간 기준 24시간 이내)
+    # [Step 2] 인물 30인 리스트 (검색어 한국어 강제)
     # ---------------------------------------------------------
     def get_top30_people(self, category):
         current_time_str = self._get_korean_time_str()
@@ -98,6 +97,8 @@ class NewsEngine:
             f"Current KST Time: {current_time_str}. "
             f"Source: ONLY site:news.naver.com. "
             f"Target: List top 30 '{target_desc}' mentioned in news articles. "
+            # [추가됨] 검색어는 무조건 한국어로 하라는 명령
+            "SEARCH INSTRUCTION: You MUST use KOREAN keywords to find these articles on Naver. "
             "STRICT CONSTRAINT: Look for articles published strictly within the LAST 24 HOURS from the Current KST Time. "
             "If no one fits the 24-hour criteria, return an empty list. Do NOT fake data. "
             "Sorting: Sort by mention count (Highest first). "
@@ -129,7 +130,7 @@ class NewsEngine:
         pass
 
     # ---------------------------------------------------------
-    # [Step 4] 팩트 체크 (한국 시간 기준 24시간 이내)
+    # [Step 4] 팩트 체크 (검색어 한국어 강제)
     # ---------------------------------------------------------
     def fetch_article_details(self, name_kr, name_en, category, rank):
         current_time_str = self._get_korean_time_str()
@@ -144,9 +145,11 @@ class NewsEngine:
             f"Current KST Time: {current_time_str}. "
             f"Source: site:news.naver.com. "
             f"Query: '{search_name}'. "
+            # [추가됨] 한국어로 검색하라는 명령
+            "SEARCH INSTRUCTION: Search using the KOREAN name to find original articles. "
             "Task: Find official news articles published strictly within the LAST 24 HOURS from now. "
             "Output: Summarize the key facts in English (3 sentences). "
-            "Constraint: If no articles are found in the last 24 hours, explicitly return 'NO NEWS FOUND'. Do not use old news."
+            "Constraint: If no articles are found in the last 24 hours, explicitly return 'NO NEWS FOUND'."
         )
 
         try:
