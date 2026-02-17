@@ -1,8 +1,8 @@
 name: K-Enter 24 Auto Scraper
 
 on:
-  schedule:
-    - cron: '11 * * * *' # Executes at minute 11 of every hour
+#  schedule:
+#    - cron: '11 * * * *' # Executes at minute 11 of every hour
   
   workflow_dispatch: # Manual run button
 
