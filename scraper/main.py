@@ -1,6 +1,8 @@
 import os
 import json
 from chart_api import ChartEngine
+from news_api import NewsEngine
+from naver_api import NaverImageEngine
 from database import DatabaseManager
 from supabase import create_client
 
@@ -8,6 +10,9 @@ from supabase import create_client
 supa_url = os.environ.get("SUPABASE_URL")
 supa_key = os.environ.get("SUPABASE_KEY")
 supabase = create_client(supa_url, supa_key) if supa_url and supa_key else None
+
+# 인물 30인 리스트 (추후 DB 관리 권장)
+TARGET_PEOPLE = ["임영웅", "뉴진스", "에스파", "아이브", "방탄소년단"] # 예시
 
 def get_run_count():
     if not supabase: return 0
@@ -28,42 +33,40 @@ def run_automation():
     run_count = get_run_count()
     key_idx = (run_count % 8) + 1
     api_key = os.environ.get(f"GROQ_API_KEY{key_idx}")
-    
-    # [설정] 1번(0시/8시/16시), 5번(4시/12시/20시) 키일 때 차트 업데이트
     should_update_chart = key_idx in [1, 5]
     
     print(f"🚀 [Cycle {run_count}] Key #{key_idx} | Chart Update: {should_update_chart}")
     
     db = DatabaseManager()
+    img_engine = NaverImageEngine()
     
+    # --- Phase 1: Chart Update ---
     if should_update_chart:
-        engine = ChartEngine()
-        engine.set_groq_client(api_key) # AI 분석용 키 주입
-        
-        categories = ["k-pop", "k-drama", "k-movie", "k-entertain"]
-        for cat in categories:
+        chart_engine = ChartEngine()
+        chart_engine.set_groq_client(api_key)
+        for cat in ["k-pop", "k-drama", "k-movie", "k-entertain"]:
             print(f"📊 Processing {cat}...")
-            chart_json = engine.get_top10_chart(cat)
-            data = json.loads(chart_json).get("top10", [])
-            
-            if data:
-                # live_rankings 테이블 형식에 맞춰 데이터 매핑
-                db_data = []
-                for item in data:
-                    db_data.append({
-                        "category": cat,
-                        "rank": item.get('rank'),
-                        "title": item.get('title'),
-                        "meta_info": item.get('info', ''),
-                        "score": 100
-                    })
-                db.save_rankings(db_data)
-                print(f"✅ {cat} Rankings Updated.")
-            else:
-                print(f"⚠️ No data found for {cat}")
+            data = json.loads(chart_engine.get_top10_chart(cat)).get("top10", [])
+            db_data = []
+            for item in data:
+                img_url = img_engine.get_image_url(f"{cat} {item['title']}")
+                db_data.append({
+                    "category": cat, "rank": item.get('rank'),
+                    "title": item.get('title'), "meta_info": str(item.get('info', '')),
+                    "image_url": img_url, "score": 100
+                })
+            db.save_rankings(db_data)
 
-    # Phase 2: 기사 작성은 매시간 실행 (여기서 news_api 연동)
-    print(f"📝 Generating News Articles for this cycle...")
+    # --- Phase 2: News/Person Generation ---
+    print(f"📝 Generating News Articles...")
+    news_engine = NewsEngine(api_key)
+    for person in TARGET_PEOPLE:
+        context = news_engine.fetch_rss_context(keyword=person)
+        if context:
+            title, body = news_engine.generate_article(person, context)
+            img_url = img_engine.get_image_url(f"연예인 {person}")
+            # db.save_news({'title': title, 'content': body, 'image_url': img_url, 'target': person})
+            print(f"✅ Article for {person} created.")
     
     update_run_count(run_count)
 
