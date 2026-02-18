@@ -1,90 +1,84 @@
-import asyncio
+import os
 import json
-from playwright.async_api import async_playwright
+import requests
+from datetime import datetime, timedelta
+from groq import Groq
 
 class ChartEngine:
     def __init__(self):
-        self.ua = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
-        self.rotation_map = {
-            "k-pop": ["melon", "genie", "bugs"],
-            "k-drama": ["naver_search", "naver_search", "naver_search"],
-            "k-movie": ["naver_search", "naver_search", "naver_search"],
-            "k-entertain": ["naver_search", "naver_search", "naver_search"]
+        self.groq_client = None
+        self.kobis_key = os.environ.get("KOBIS_API_KEY")
+        self.headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
         }
 
-    async def get_top10_chart(self, category, run_count):
-        targets = self.rotation_map.get(category, ["naver_search"])
-        target = targets[run_count % 3]
+    def set_groq_client(self, api_key):
+        """main.py에서 결정된 로테이션 키를 설정합니다."""
+        self.groq_client = Groq(api_key=api_key)
+
+    def get_top10_chart(self, category, run_count):
+        """카테고리별 데이터 소스 분기"""
+        if category == "k-movie":
+            return self._get_kobis_movie()
+        elif category == "k-pop":
+            return self._get_circle_chart_text()
+        elif category in ["k-drama", "k-entertain"]:
+            return self._get_nielsen_text(category)
+        return json.dumps({"top10": []})
+
+    def _get_kobis_movie(self):
+        """[영화] 영진위 공식 API 활용 (차단 위험 0%)"""
+        target_date = (datetime.now() - timedelta(days=1)).strftime("%Y%m%d")
+        url = f"http://www.kobis.or.kr/kobisopenapi/webservice/rest/boxoffice/searchDailyBoxOfficeList.json?key={self.kobis_key}&targetDt={target_date}"
         
-        print(f"🔍 [Attempt] Category: {category} | Primary: {target}")
-        result = await self._scrape_entry(target, category)
+        try:
+            res = requests.get(url, timeout=10)
+            data = res.json().get("boxOfficeResult", {}).get("dailyBoxOfficeList", [])
+            top10 = []
+            for item in data[:10]:
+                top10.append({
+                    "rank": int(item['rank']),
+                    "title": item['movieNm'],
+                    "info": f"관객수: {item['audiCnt']}"
+                })
+            return json.dumps({"top10": top10}, ensure_ascii=False)
+        except:
+            return json.dumps({"top10": []})
+
+    def _get_circle_chart_text(self):
+        """[가요] 써클차트 텍스트 수집 후 Groq AI 분석"""
+        url = "https://circlechart.kr/page_chart/global.circle"
+        try:
+            res = requests.get(url, headers=self.headers, timeout=10)
+            return self._ai_extract_chart(res.text, "K-Pop Global Chart")
+        except: return json.dumps({"top10": []})
+
+    def _get_nielsen_text(self, category):
+        """[드라마/예능] 닐슨코리아 텍스트 수집 후 Groq AI 분석"""
+        url = "https://www.nielsenkorea.co.kr/tv_terrestrial_day.asp"
+        try:
+            res = requests.get(url, headers=self.headers, timeout=10)
+            return self._ai_extract_chart(res.text, f"Nielsen Korea {category} Ratings")
+        except: return json.dumps({"top10": []})
+
+    def _ai_extract_chart(self, raw_html, context):
+        """지저분한 HTML/텍스트에서 Groq AI가 순위만 추출"""
+        if not self.groq_client: return json.dumps({"top10": []})
+
+        prompt = f"""
+        당신은 데이터 추출 전문가입니다. 제공된 텍스트 데이터에서 {context}의 최신 Top 10 순위를 찾아 JSON으로 반환하세요.
+        - 형식: {{"top10": [{{"rank": 1, "title": "제목", "info": "수치/가수"}}, ...]}}
+        - 텍스트가 부족하면 알려진 가장 최신 정보를 바탕으로 작성하세요.
+        - 데이터: {raw_html[:4000]}  # 상위 4000자만 분석
+        """
         
-        # 메인 타겟 실패 시 네이버 백업 실행
-        if not result or len(result) < 3:
-            print(f"⚠️ {target} failed/insufficient. Switching to Emergency Backup: naver_search")
-            result = await self._scrape_entry("naver_search", category)
-            
-        return json.dumps({"top10": result}, ensure_ascii=False)
-
-    async def _scrape_entry(self, target, category):
-        async with async_playwright() as p:
-            browser = await p.chromium.launch(headless=True)
-            # 권한 및 언어 설정 추가 (차단 방지)
-            context = await browser.new_context(user_agent=self.ua, locale="ko-KR")
-            page = await context.new_page()
-            data = []
-            
-            try:
-                if target == "melon":
-                    await page.goto("https://www.melon.com/chart/index.htm", timeout=30000)
-                    await page.wait_for_selector(".lst50", timeout=10000)
-                    rows = await page.query_selector_all(".lst50")
-                    for i, r in enumerate(rows[:10]):
-                        t = await (await r.query_selector(".rank01 a")).inner_text()
-                        a = await (await r.query_selector(".rank02 a")).inner_text()
-                        data.append({"rank": i+1, "title": t.strip(), "info": a.strip()})
-                
-                elif target == "naver_search":
-                    # 카테고리별 검색어 최적화
-                    queries = {
-                        "k-pop": "멜론 차트 순위",
-                        "k-drama": "드라마 시청률 순위",
-                        "k-movie": "박스오피스 순위",
-                        "k-entertain": "예능 시청률 순위"
-                    }
-                    search_url = f"https://search.naver.com/search.naver?query={queries.get(category, category)}"
-                    await page.goto(search_url, timeout=30000)
-                    
-                    # 네이버 통합검색 결과 로딩 대기 (중요)
-                    await page.wait_for_load_state("networkidle")
-                    await page.mouse.wheel(0, 500) # 약간의 스크롤로 로딩 유도
-                    await asyncio.sleep(2) # 안정적인 로딩을 위한 대기
-
-                    # [수정된 Selector] 네이버 통합검색 순위 리스트 패턴 (2026 기준 대응)
-                    # 시청률/박스오피스 공통 요소를 더 넓게 잡음
-                    items = await page.query_selector_all(".api_subject_bx .list_box .item, .api_subject_bx .lst_common .item")
-                    
-                    if not items:
-                        # 대안 Selector 시도 (박스오피스 전용 등)
-                        items = await page.query_selector_all(".box_image_list .item, .movie_audience_ranking .item")
-
-                    for i, item in enumerate(items[:10]):
-                        # 제목 찾기
-                        title_el = await item.query_selector(".name, .title, .tit")
-                        # 정보(시청률/관객수) 찾기
-                        info_el = await item.query_selector(".figure, .sub_text, .value")
-                        
-                        if title_el:
-                            t_text = await title_el.inner_text()
-                            i_text = await info_el.inner_text() if info_el else ""
-                            data.append({"rank": i+1, "title": t_text.strip(), "info": i_text.strip()})
-
-                await browser.close()
-                return data
-
-            except Exception as e:
-                print(f"❌ Scrape Error ({target} - {category}): {e}")
-                # 실패 시 로그용 스크린샷 저장
-                await page.screenshot(path=f"debug_{category}.png")
-                await browser.close()
-                return None
+        try:
+            chat = self.groq_client.chat.completions.create(
+                messages=[{"role": "user", "content": prompt}],
+                model="llama3-8b-8192", # 빠른 분석을 위해 8B 모델 사용
+                response_format={"type": "json_object"}
+            )
+            return chat.choices[0].message.content
+        except Exception as e:
+            print(f"AI 분석 실패: {e}")
+            return json.dumps({"top10": []})
