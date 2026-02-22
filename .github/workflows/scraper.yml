@@ -10,16 +10,22 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+          # 캐싱을 추가하면 실행 속도가 더 빨라집니다.
+          cache: 'pip'
+
       - name: Install dependencies
         run: |
-          pip install playwright supabase requests groq
-          playwright install chromium
+          # playwright와 chromium 설치를 제거하여 시간을 단축합니다.
+          pip install supabase requests groq feedparser
+
       - name: Run Scraper
         env:
+          # Supabase & Groq Keys
           SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
           GROQ_API_KEY1: ${{ secrets.GROQ_API_KEY1 }}
@@ -30,6 +36,11 @@ jobs:
           GROQ_API_KEY6: ${{ secrets.GROQ_API_KEY6 }}
           GROQ_API_KEY7: ${{ secrets.GROQ_API_KEY7 }}
           GROQ_API_KEY8: ${{ secrets.GROQ_API_KEY8 }}
+          
+          # [추가] 네이버 및 KOBIS API 키
+          NAVER_CLIENT_ID: ${{ secrets.NAVER_CLIENT_ID }}
+          NAVER_CLIENT_SECRET: ${{ secrets.NAVER_CLIENT_SECRET }}
+          KOBIS_API_KEY: ${{ secrets.KOBIS_API_KEY }}
         run: |
           cd scraper
           python main.py
