@@ -23,11 +23,9 @@ class ChartEngine:
             models = self.groq_client.models.list()
             model_ids = [m.id for m in models.data]
             
-            # 우선순위: 고성능 70B 모델 -> 최신 70B -> 경량 8B
             preferences = [
                 "llama-3.3-70b-specdec",
                 "llama-3.1-70b-versatile",
-                "llama-3.3-70b-versatile",
                 "llama-3.1-8b-instant"
             ]
             
@@ -38,7 +36,6 @@ class ChartEngine:
                     return
             
             self.selected_model = model_ids[0]
-            print(f"⚠️ Preferred models not found. Selected fallback: {self.selected_model}")
         except Exception as e:
             print(f"❌ Model selection error: {e}")
             self.selected_model = "llama-3.1-8b-instant"
@@ -48,7 +45,6 @@ class ChartEngine:
         max_retries = 1
         for attempt in range(max_retries + 1):
             try:
-                # 작업 전 랜덤 대기 (4.0s ~ 5.0s)
                 wait_time = random.uniform(4.0, 5.0)
                 print(f"⏳ [{category}] Waiting {wait_time:.2f}s (Attempt {attempt+1})...")
                 time.sleep(wait_time)
@@ -56,11 +52,12 @@ class ChartEngine:
                 if category == "k-movie":
                     return self._get_kobis_movie()
                 
-                # 뉴스 기반 카테고리
+                # 검색어 고도화: '오늘', '발표', '최신' 키워드 추가
                 queries = {
-                    "k-pop": "오늘 실시간 음원 차트 순위 멜론 써클차트",
-                    "k-drama": "드라마 시청률 순위 닐슨코리아 최신",
-                    "k-entertain": "예능 프로그램 시청률 순위 닐슨코리아 최신"
+                    "k-pop": "오늘 멜론 써클차트 음원 순위 톱10",
+                    "k-drama": "어제 드라마 시청률 순위 닐슨코리아 최신발표",
+                    "k-entertain": "어제 예능 프로그램 시청률 순위 닐슨코리아 최신발표",
+                    "k-culture": "오늘 가장 핫한 팝업스토어 성수동 한남동 핫플 순위"
                 }
                 return self._get_chart_via_news(category, queries.get(category, category))
 
@@ -73,32 +70,47 @@ class ChartEngine:
                     return json.dumps({"top10": []})
 
     def _get_kobis_movie(self):
+        """영화진흥위원회 공식 API (어제 날짜 기준)"""
         target_date = (datetime.now() - timedelta(days=1)).strftime("%Y%m%d")
         url = f"http://www.kobis.or.kr/kobisopenapi/webservice/rest/boxoffice/searchDailyBoxOfficeList.json?key={self.kobis_key}&targetDt={target_date}"
         res = requests.get(url, timeout=10)
         data = res.json().get("boxOfficeResult", {}).get("dailyBoxOfficeList", [])
-        top10 = [{"rank": i+1, "title": m['movieNm'], "info": f"관객 {m['audiCnt']}"} for i, m in enumerate(data[:10])]
+        top10 = [{"rank": i+1, "title": m['movieNm'], "info": f"관객 {int(m['audiCnt']):,}"} for i, m in enumerate(data[:10])]
         return json.dumps({"top10": top10}, ensure_ascii=False)
 
     def _get_chart_via_news(self, category, query):
+        """네이버 뉴스 API (날짜순 정렬 적용)"""
         client_id = os.environ.get("NAVER_CLIENT_ID")
         client_secret = os.environ.get("NAVER_CLIENT_SECRET")
-        url = f"https://openapi.naver.com/v1/search/news.json?query={query}&display=15&sort=sim"
+        
+        # 'sort=date'를 사용하여 가장 최근 기사를 우선적으로 가져옵니다.
+        url = f"https://openapi.naver.com/v1/search/news.json?query={query}&display=20&sort=date"
         headers = {"X-Naver-Client-Id": client_id, "X-Naver-Client-Secret": client_secret}
         
         res = requests.get(url, headers=headers, timeout=10)
         items = res.json().get('items', [])
         if not items: raise ValueError("No news items found")
             
-        context = " ".join([f"{i['title']} {i['description']}" for i in items])
+        # AI가 현재 시점을 인지할 수 있도록 오늘 날짜를 삽입합니다.
+        today_str = datetime.now().strftime("%Y년 %m월 %d일")
+        context = f"현재 시점: {today_str}\n\n뉴스 데이터:\n"
+        context += " ".join([f"[{i['pubDate']}] {i['title']} - {i['description']}" for i in items])
+        
         return self._ai_extract_chart(category, context)
 
     def _ai_extract_chart(self, category, context):
+        """Groq AI를 통한 최신 순위 추출"""
         prompt = f"""
-        당신은 한국 대중문화 데이터 전문가입니다. 뉴스 텍스트를 분석하여 {category}의 최신 Top 10 순위표를 작성하세요.
-        - 반드시 다음 JSON 형식만 응답하세요:
-        {{"top10": [{{"rank": 1, "title": "제목", "info": "수치/정보"}}, ...]}}
-        텍스트: {context[:3000]}
+        당신은 대한민국 문화 트렌드 분석가입니다. 
+        제공된 최신 뉴스 데이터를 분석하여 {category} 카테고리의 현재 Top 10 순위를 추출하세요.
+
+        [지침]
+        1. '현재 시점'과 가장 가까운 날짜의 기사 내용을 우선시하세요. 2개월 전과 같은 과거 데이터는 절대 포함하지 마세요.
+        2. 순위가 명확하지 않다면 뉴스에서 가장 많이 언급되거나 핫한 순서대로 10개를 선정하세요.
+        3. 반드시 다음 JSON 형식으로만 응답하세요:
+        {{"top10": [{{"rank": 1, "title": "제목", "info": "수치 또는 최신소식"}}, ...]}}
+        
+        텍스트: {context[:3500]}
         """
         chat = self.groq_client.chat.completions.create(
             messages=[{"role": "user", "content": prompt}],
