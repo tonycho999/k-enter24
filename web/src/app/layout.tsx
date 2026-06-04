@@ -2,12 +2,11 @@ import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import './globals.css';
 import Footer from '@/components/Footer';
-import Script from 'next/script'; // ✅ 구글 애널리틱스를 위한 Script 임포트 추가
-import SEO from '@/components/SEO'; // ✅ [추가 1] SEO 컴포넌트 임포트
+import Script from 'next/script'; 
+import SEO from '@/components/SEO'; 
 
 const inter = Inter({ subsets: ['latin'] });
 
-// [SEO] 구글 검색 노출을 위한 메타데이터
 export const metadata: Metadata = {
   title: 'K-ENTER 24 | Real-time K-Pop & K-Drama News',
   description: 'The world\'s fastest source for K-Entertainment news. Monitoring 1,200+ articles daily in real-time. BTS, BLACKPINK, NewJeans updates instantly.',
@@ -27,7 +26,7 @@ export const metadata: Metadata = {
     siteName: 'K-ENTER 24',
     images: [
       {
-        url: '/og-image.png', // 💡 public 폴더의 og-image.png 적용 완료
+        url: '/og-image.png',
         width: 1200,
         height: 630,
       },
@@ -36,7 +35,7 @@ export const metadata: Metadata = {
     type: 'website',
   },
   icons: {
-    icon: '/favicon.png', // 💡 기존 .ico 파일명에서 .png로 수정 완료
+    icon: '/favicon.png',
   },
   alternates: {
     types: {
@@ -52,12 +51,19 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      {/* ✅ [추가 2] AI 답변 엔진(AEO)을 위한 JSON-LD 구조화 데이터 삽입 */}
       <head>
         <SEO />
       </head>
       <body className={inter.className}>
-        {/* ✅ 구글 애널리틱스 스크립트 추가 시작 (새로운 ID 반영 완료) */}
+        {/* ✅ 구글 애드센스 스크립트 추가 */}
+        <Script
+          async
+          src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7272957295128241"
+          strategy="afterInteractive"
+          crossOrigin="anonymous"
+        />
+
+        {/* ✅ 구글 애널리틱스 스크립트 */}
         <Script
           src="https://www.googletagmanager.com/gtag/js?id=G-1E4WN8MZ9N"
           strategy="afterInteractive"
@@ -71,7 +77,6 @@ export default function RootLayout({
             gtag('config', 'G-1E4WN8MZ9N');
           `}
         </Script>
-        {/* ✅ 구글 애널리틱스 스크립트 추가 끝 */}
         
         <main className="min-h-screen">
           {children}
