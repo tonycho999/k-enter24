@@ -43,6 +43,10 @@ export const metadata: Metadata = {
       'application/rss+xml': 'https://k-enter24.com/rss.xml',
     },
   },
+  // ✅ [핵심 추가] 구글 애드센스 소유권 확인용 메타 태그 (봇이 즉시 확인 가능)
+  other: {
+    'google-adsense-account': 'ca-pub-7272957295128241',
+  },
 };
 
 export default function RootLayout({
@@ -58,7 +62,7 @@ export default function RootLayout({
       </head>
       <body className={inter.className}>
         
-        {/* ✅ [추가됨] 구글 애드센스 스크립트 */}
+        {/* ✅ 구글 애드센스 스크립트 */}
         <Script
           async
           src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7272957295128241"
