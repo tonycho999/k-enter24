@@ -9,19 +9,19 @@ const ADS = [
   {
     id: 1,
     link: "https://invl.me/clnkyyb",
-    imgPc: "https://k-enter24.com/ad1_1200.png",    // 👈 1번 광고 PC용 이미지 주소 (수정 필요)
+    imgPc: "https://k-enter24.com/ad1_1000.png",    // 👈 1번 광고 PC용 이미지 주소 (수정 필요)
     imgMobile: "https://k-enter24.com/ad1_600.png", // 👈 1번 광고 모바일용 이미지 주소 (수정 필요)
   },
   {
     id: 2,
     link: "https://invl.app/clnkyyd",
-    imgPc: "https://k-enter24.com/ad2_1200.png",    // 👈 2번 광고 PC용 이미지 주소 (수정 필요)
+    imgPc: "https://k-enter24.com/ad2_1000.png",    // 👈 2번 광고 PC용 이미지 주소 (수정 필요)
     imgMobile: "https://k-enter24.com/ad2_600.png", // 👈 2번 광고 모바일용 이미지 주소 (수정 필요)
   },
   {
     id: 3,
     link: "https://invl.me/clnkyyh",
-    imgPc: "https://k-enter24.com/ad3_1200.png",    // 👈 3번 광고 PC용 이미지 주소 (수정 필요)
+    imgPc: "https://k-enter24.com/ad3_1000.png",    // 👈 3번 광고 PC용 이미지 주소 (수정 필요)
     imgMobile: "https://k-enter24.com/ad3_600.png", // 👈 3번 광고 모바일용 이미지 주소 (수정 필요)
   }
 ];
