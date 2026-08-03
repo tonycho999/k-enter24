@@ -1,7 +1,0 @@
-requests
-beautifulsoup4
-playwright
-google-genai
-groq
-supabase
-pytz
