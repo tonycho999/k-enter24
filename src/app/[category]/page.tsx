@@ -4,6 +4,7 @@ import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 export const dynamic = 'force-dynamic';
+export const revalidate = 60;
 
 export default async function CategoryPage({ params }: { params: { category: string } }) {
   // URL에서 넘어온 영어 소문자(k-pop)를 대문자(K-POP)로 변환하여 DB에서 찾기 쉽게 만듭니다.
