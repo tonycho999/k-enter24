@@ -7,6 +7,7 @@ import './globals.css';
 import AdTop from '../components/AdTop';
 import AdLeft from '../components/AdLeft';
 import AdRight from '../components/AdRight';
+import SearchBar from '../components/SearchBar'; 
 
 export const metadata: Metadata = {
   title: 'K-ENTER 24 | Global K-Culture Blog',
@@ -24,9 +25,7 @@ export default function RootLayout({ children }: { children: React.ReactNode; })
           
           <header className="header-top">
             <Link href="/" className="logo">K-ENTER 24</Link>
-            <div className="search-bar">
-              <input type="text" placeholder="Search news, idols, drama..." />
-              🔍
+              <SearchBar />
             </div>
           </header>
 
