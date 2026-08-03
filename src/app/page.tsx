@@ -18,8 +18,6 @@ export default async function Home() {
 
   return (
     <div>
-      <h2 className="page-title">🔥 Trending K-Culture</h2>
-      
       {/* 2. DB에 글이 아직 하나도 없을 때 보여줄 안내 화면 */}
       {posts.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '100px 0', color: '#64748b' }}>
