@@ -1,32 +1,56 @@
+// src/app/page.tsx
 import Link from 'next/link';
+import { PrismaClient } from '@prisma/client';
 
-const mockPosts = [
-  { id: 1, category: 'K-POP', title: 'BTS Jin, First Solo Album Release Post-Military Service... Global Fans Cheer', desc: 'BTS oldest member Jin is working on his first solo album aiming for a release in the second half of the year after completing his military service.', image: 'https://images.unsplash.com/photo-1549834125-82d3c48159a3?q=80&w=800&auto=format&fit=crop' },
-  { id: 2, category: 'K-DRAMA', title: 'Queen of Tears Kim Soo-hyun & Kim Ji-won, The Secret Behind Record Ratings?', desc: 'The tvN drama Queen of Tears is creating a syndrome, breaking its own highest viewership ratings every episode. The perfect chemistry between the two lead actors stands out.', image: 'https://images.unsplash.com/photo-1574375927938-d5a98e8ffe85?q=80&w=800&auto=format&fit=crop' },
-  { id: 3, category: 'K-MOVIE', title: 'The Roundup 4 Surpasses 10 Million Viewers in First Week... Ma Dong-seok Power', desc: 'The fourth installment of Korea\'s representative action series, The Roundup, has taken over theaters, showing an incredible box office pace right upon release.', image: 'https://images.unsplash.com/photo-1536440136628-849c177e76a1?q=80&w=800&auto=format&fit=crop' },
-  { id: 4, category: 'K-CULTURE', title: 'Korean Street Food Pop-up in New York, Locals Wait for 2 Hours', desc: 'The popularity of K-food is burning hot. A tteokbokki and hot dog pop-up store opened in Manhattan, New York, is a huge success with locals flocking to it.', image: 'https://images.unsplash.com/photo-1583224964978-225ddb3ea386?q=80&w=800&auto=format&fit=crop' },
-  { id: 5, category: 'K-ENTERTAINMENT', title: 'Running Man Special Episode: The Return of the Legends', desc: 'The beloved variety show brings back iconic guests for its anniversary special, promising non-stop laughter and nostalgia for long-time fans.', image: 'https://images.unsplash.com/photo-1601004890684-d8cbf643f5f2?q=80&w=800&auto=format&fit=crop' }
-];
+// 🚀 Prisma Client 인스턴스 생성 (DB와 통신하는 일꾼)
+const prisma = new PrismaClient();
 
-export default function Home() {
+// Next.js 14 최신 기능: 이 페이지는 캐시하지 않고 방문할 때마다 최신 DB 글을 보여주도록 설정! (매우 중요⭐️)
+export const dynamic = 'force-dynamic';
+
+export default async function Home() {
+  // 1. Supabase DB에서 최신 글 목록을 가져옵니다. (최신순 정렬)
+  const posts = await prisma.post.findMany({
+    orderBy: { createdAt: 'desc' },
+    // 일단 화면이 꽉 차 보이도록 최근 12개만 가져옵니다.
+    take: 12, 
+  });
+
   return (
     <div>
-      <h2 className="page-title">🔥 Trending Now</h2>
+      <h2 className="page-title">🔥 Trending K-Culture</h2>
       
-      <div className="article-grid">
-        {mockPosts.map((post) => (
-          <Link href={`/${post.category.toLowerCase()}/${post.id}`} key={post.id} className="article-card">
-            <div className="image-wrapper">
-              <img src={post.image} alt={post.title} />
-            </div>
-            <div className="card-content">
-              <div className="card-category">{post.category}</div>
-              <h3 className="card-title">{post.title}</h3>
-              <p className="card-desc">{post.desc}</p>
-            </div>
-          </Link>
-        ))}
-      </div>
+      {/* 2. DB에 글이 아직 하나도 없을 때 보여줄 안내 화면 */}
+      {posts.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: '100px 0', color: '#64748b' }}>
+          <h3>아직 등록된 기사가 없습니다.</h3>
+          <p>크롤링 봇을 실행하여 DB에 새 글을 채워주세요!</p>
+        </div>
+      ) : (
+        /* 3. DB에서 가져온 글이 있다면 예쁜 카드로 반복해서 그려줍니다! */
+        <div className="article-grid">
+          {posts.map((post) => {
+            // DB의 images 배열에서 첫 번째 이미지를 썸네일로 사용! (이미지가 없으면 기본 회색 배경)
+            const thumbnailUrl = post.images.length > 0 ? post.images[0] : 'https://via.placeholder.com/800x500.png?text=No+Image';
+
+            return (
+              <Link href={`/${post.category.toLowerCase()}/${post.id}`} key={post.id} className="article-card">
+                <div className="image-wrapper">
+                  <img src={thumbnailUrl} alt={post.title} />
+                </div>
+                <div className="card-content">
+                  <div className="card-category">{post.category.toUpperCase()}</div>
+                  <h3 className="card-title">{post.title}</h3>
+                  {/* content 본문이 너무 길 수 있으니 앞에서부터 100글자만 잘라서 미리보기로 보여줍니다 */}
+                  <p className="card-desc">
+                    {post.content.length > 100 ? post.content.substring(0, 100) + '...' : post.content}
+                  </p>
+                </div>
+              </Link>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
