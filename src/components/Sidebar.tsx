@@ -1,42 +1,23 @@
-'use client';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-
-const CATEGORIES = [
-  { name: 'K-Pop', path: '/k-pop' },
-  { name: 'K-Drama & Movie', path: '/k-drama-movie' },
-  { name: 'K-Entertain', path: '/k-entertain' },
-  { name: 'K-Culture', path: '/k-culture' },
-];
 
 export default function Sidebar() {
-  const pathname = usePathname();
-
   return (
-    <aside className="w-64 h-screen fixed left-0 top-0 bg-slate-900 text-white p-6 hidden md:flex flex-col">
-      <Link href="/" className="text-2xl font-bold mb-10 text-pink-500">
-        K-ENTER 24
-      </Link>
-      
-      <nav className="flex flex-col gap-4">
-        {CATEGORIES.map((cat) => {
-          const isActive = pathname?.startsWith(cat.path);
-          return (
-            <Link 
-              key={cat.path} 
-              href={cat.path}
-              className={`text-lg font-medium p-3 rounded-lg transition-colors ${
-                isActive ? 'bg-pink-500 text-white' : 'text-slate-300 hover:bg-slate-800'
-              }`}
-            >
-              {cat.name}
-            </Link>
-          );
-        })}
-      </nav>
-      
-      <div className="mt-auto text-sm text-slate-500">
-        © 2026 K-ENTER24.
+    <aside className="w-64 bg-white border-r border-slate-200 min-h-screen hidden md:block">
+      <div className="p-6">
+        <Link href="/">
+          <h1 className="text-2xl font-black text-blue-600 mb-8 cursor-pointer">K-ENTER 24</h1>
+        </Link>
+        <nav className="flex flex-col gap-4">
+          <Link href="/k-pop" className="text-slate-600 hover:text-blue-600 font-semibold transition-colors">
+            K-Pop
+          </Link>
+          <Link href="/k-drama" className="text-slate-600 hover:text-blue-600 font-semibold transition-colors">
+            K-Drama
+          </Link>
+          <Link href="/k-culture" className="text-slate-600 hover:text-blue-600 font-semibold transition-colors">
+            K-Culture
+          </Link>
+        </nav>
       </div>
     </aside>
   );
