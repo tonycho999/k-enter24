@@ -3,7 +3,7 @@ name: Auto K-Culture Bot (1 at a time)
 
 on:
   schedule:
-    # 1시간마다 1번씩 깨어나서 확인합니다.
+    # 1시간마다(매시 6분) 1번씩 깨어나서 확인합니다.
     - cron: '6 * * * *'
   workflow_dispatch:
 
@@ -20,7 +20,8 @@ jobs:
         python-version: '3.10'
         
     - name: 필수 패키지 설치
-      run: pip install requests psycopg2-binary groq google-generativeai
+      # 🚀 맨 끝에 beautifulsoup4 추가했습니다!
+      run: pip install requests psycopg2-binary groq google-generativeai beautifulsoup4
       
     - name: 순서에 맞춰 딱 1개만 실행!
       env:
