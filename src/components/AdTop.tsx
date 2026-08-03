@@ -1,12 +1,6 @@
 // src/components/AdTop.tsx
 export default function AdTop() {
-  return (
-    <div className="ad-banner-top">
-      {/* 
-        추후 여기에 구글 애드센스 스크립트를 넣으세요.
-        예: <ins className="adsbygoogle" style={{ display: 'block' }} data-ad-client="ca-pub-XXXXXX" ... /> 
-      */}
-      Google AdSense Top Banner (728x90)
-    </div>
-  );
+  // 💡 애드센스 승인 전까지는 빈 화면조차 차지하지 않도록 숨깁니다.
+  // 나중에 승인되면 return null; 을 지우고 광고 코드를 넣으시면 됩니다.
+  return null;
 }
