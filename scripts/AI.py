@@ -6,29 +6,20 @@ from groq import Groq
 import google.generativeai as genai
 
 def get_best_groq_models(client):
-    """
-    브랜드명 하드코딩 X: 
-    API에서 현재 제공하는 모든 모델 리스트를 받아와서,
-    1) 출시일(created timestamp)이 가장 최신이면서
-    2) 파라미터 숫자(ex: 70b, 8x7b)가 가장 큰 순서대로 자동 정렬합니다.
-    """
-    # 1. 실시간 사용 가능한 전체 모델 리스트 가져오기
     models = client.models.list().data
     valid_models = []
     
     for m in models:
-        # 텍스트 전용이 아닌 모델(음성, 비전 등)만 필터링
-        if 'whisper' in m.id.lower() or 'vision' in m.id.lower():
-            continue
-        valid_models.append(m)
-        
+        mid = m.id.lower()
+        # 🚀 [추가된 부분] 뼈대 있는 1티어 모델(Llama, Mixtral, Gemma)만 허용!
+        if 'llama' in mid or 'mixtral' in mid or 'gemma' in mid:
+            if 'whisper' not in mid and 'vision' not in mid and 'guard' not in mid:
+                valid_models.append(m)
+                
     def sort_key(m):
-        # API가 제공하는 모델 출시일 (최신일수록 점수 높음)
         created_time = getattr(m, 'created', 0)
-        
-        # 모델 이름에서 파라미터 크기(숫자)만 정규식으로 추출 (브랜드명 무시)
-        # 예: 8x7b -> 56, 70b -> 70
         param_size = 0
+        import re
         match_multi = re.search(r'(\d+)x(\d+)b', m.id.lower())
         if match_multi:
             param_size = int(match_multi.group(1)) * int(match_multi.group(2))
@@ -36,8 +27,10 @@ def get_best_groq_models(client):
             match_single = re.search(r'(\d+)b', m.id.lower())
             if match_single:
                 param_size = int(match_single.group(1))
-                
         return (created_time, param_size)
+        
+    valid_models.sort(key=sort_key, reverse=True)
+    return [m.id for m in valid_models]
         
     # 출시일과 파라미터 크기 기준으로 내림차순(가장 좋고 최신인 것부터) 정렬
     valid_models.sort(key=sort_key, reverse=True)
