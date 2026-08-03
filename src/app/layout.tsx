@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
-import './globals.css';
-import Sidebar from '../components/Sidebar';
+import '@/app/globals.css'; 
+import Sidebar from '@/components/Sidebar'; // Sidebar 경로도 절대 경로로 통일합니다.
 
 const inter = Inter({ subsets: ['latin'] });
 
