@@ -1,5 +1,7 @@
 # scripts/auto_pop.py
 import os, requests, psycopg2
+from datetime import datetime, timezone
+from email.utils import parsedate_to_datetime
 from AI import get_ai_response
 
 NAVER_CLIENT_ID = os.environ.get("NAVER_CLIENT_ID")
@@ -10,12 +12,17 @@ DATABASE_URL = os.environ.get("DATABASE_URL")
 CATEGORY_NAME = "K-DRAMA"
 SEARCH_QUERY = "드라마"
 
-# 1️⃣ [신규 추가] DB에서 최근 작성한 글 제목 5개를 가져오는 함수
+# 🚀 [추가] 파이썬이 싫어하는 pgbouncer 글자를 지워주는 공통 함수
+def get_clean_db_url():
+    if DATABASE_URL:
+        return DATABASE_URL.replace("?pgbouncer=true", "")
+    return ""
+
 def get_recent_titles():
     try:
-        conn = psycopg2.connect(DATABASE_URL)
+        # pgbouncer가 제거된 깔끔한 주소로 접속!
+        conn = psycopg2.connect(get_clean_db_url())
         cur = conn.cursor()
-        # 현재 카테고리에서 최근 작성된 5개의 제목만 가져옵니다.
         cur.execute("""SELECT title FROM "Post" WHERE category = %s ORDER BY "createdAt" DESC LIMIT 5""", (CATEGORY_NAME,))
         rows = cur.fetchall()
         cur.close()
@@ -25,19 +32,31 @@ def get_recent_titles():
         print(f"DB 조회 에러: {e}")
         return []
 
-def search_naver_news(query, display=15):
-    url = f"https://openapi.naver.com/v1/search/news.json?query={query}&display={display}&sort=sim"
+# 🚀 [추가] 24시간 이내의 팔팔한 최신 뉴스만 걸러내는 함수
+def filter_recent_24h_news(news_items):
+    recent_items = []
+    now_utc = datetime.now(timezone.utc)
+    for item in news_items:
+        try:
+            pub_date = parsedate_to_datetime(item['pubDate'])
+            time_diff = now_utc - pub_date
+            # 86400초(24시간) 이내인 기사만 통과!
+            if time_diff.total_seconds() <= 86400:
+                recent_items.append(item)
+        except Exception as e:
+            continue
+    return recent_items
+
+# 🚀 [수정] 24시간 필터링을 위해 sort=date(최신순)으로 50개를 넉넉히 가져옴
+def search_naver_news(query, display=50):
+    url = f"https://openapi.naver.com/v1/search/news.json?query={query}&display={display}&sort=date"
     headers = {"X-Naver-Client-Id": NAVER_CLIENT_ID, "X-Naver-Client-Secret": NAVER_CLIENT_SECRET}
     res = requests.get(url, headers=headers)
     return res.json().get('items', [])
 
-# 2️⃣ [로직 변경] 최근 다룬 주제를 '제외'하고 트렌드를 뽑도록 AI에게 명령
 def extract_trending_entity(news_items, recent_titles):
     titles = [item['title'].replace('<b>', '').replace('</b>', '') for item in news_items]
-    
-    # 최근 작성한 기사 제목들을 AI에게 알려주어 중복을 방지합니다.
     recent_info = f"\n[주의사항: 최근 작성한 기사 제목들]\n{recent_titles}\n위 기사들에서 이미 메인으로 다루었던 인물이나 그룹은 절대 중복해서 선택하지 마." if recent_titles else ""
-    
     system_prompt = f"""너는 트렌드 분석가야. 주어진 뉴스 제목들에서 가장 화제가 되는 특정 인물, 아이돌, 또는 작품 이름 딱 1개를 찾아.
     {recent_info}
     반드시 JSON 형식으로 답변해. 형식: {{"keyword": "..."}}"""
@@ -53,18 +72,28 @@ def get_unsplash_images(keyword, count=2):
 def main():
     print(f"[{CATEGORY_NAME}] 작업 시작...")
     
-    # 🚀 실행 시작과 동시에 DB에서 최근 글 5개를 읽어옵니다.
     recent_titles = get_recent_titles()
     print(f"🧐 최근 작성된 기사들: {recent_titles}")
 
-    broad_news = search_naver_news(SEARCH_QUERY, 20) # 선택지를 넓히기 위해 20개로 증가
-    if not broad_news: return
+    raw_news = search_naver_news(SEARCH_QUERY, 50)
+    broad_news = filter_recent_24h_news(raw_news)
     
-    # 🚀 트렌드를 뽑을 때 최근 기사 목록을 같이 넘겨서 중복을 피하게 합니다.
+    if not broad_news:
+        print("❌ 24시간 이내의 최신 기사가 없습니다. 작업을 취소하고 다음 턴을 노립니다.")
+        exit(1)
+        
+    print(f"✅ 24시간 이내 기사 {len(broad_news)}개 확보 완료!")
+    
     trending_entity = extract_trending_entity(broad_news, recent_titles)
     print(f"🔥 핫이슈 (중복 필터링 완료): {trending_entity}")
     
-    deep_news = search_naver_news(trending_entity, 3)
+    raw_deep_news = search_naver_news(trending_entity, 15)
+    deep_news = filter_recent_24h_news(raw_deep_news)[:3]
+    
+    if not deep_news:
+        print("❌ 해당 핫이슈의 24시간 이내 디테일 기사가 부족합니다.")
+        exit(1)
+        
     article_contents = "\n".join([f"- {n['title']}: {n['description']}" for n in deep_news])
     
     system_prompt = """
@@ -85,7 +114,8 @@ def main():
     if not images:
         images = ['https://via.placeholder.com/800x500.png?text=No+Image']
     
-    conn = psycopg2.connect(DATABASE_URL)
+    # 🚀 pgbouncer가 제거된 깔끔한 주소로 접속!
+    conn = psycopg2.connect(get_clean_db_url())
     cur = conn.cursor()
     cur.execute(
         """INSERT INTO "Post" (title, content, category, images, views, "createdAt", "updatedAt") 
