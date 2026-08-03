@@ -11,13 +11,13 @@ export default function RootLayout({ children }: { children: React.ReactNode; })
   return (
     <html lang="en">
       <body>
-        <div className="layout-container">
-          <Sidebar />
-          <main className="main-content">
-            <div className="content-wrapper">
+        <div className="layout-wrapper">
+          <div className="layout-container">
+            <Sidebar />
+            <main className="main-content">
               {children}
-            </div>
-          </main>
+            </main>
+          </div>
         </div>
       </body>
     </html>
