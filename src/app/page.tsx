@@ -20,7 +20,6 @@ export default async function Home() {
       {posts.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '100px 0', color: '#64748b' }}>
           <h3>아직 등록된 기사가 없습니다.</h3>
-          <p>크롤링 봇을 실행하여 DB에 새 글을 채워주세요!</p>
         </div>
       ) : (
         /* 3. DB에서 가져온 글이 있다면 예쁜 카드로 반복해서 그려줍니다! */
