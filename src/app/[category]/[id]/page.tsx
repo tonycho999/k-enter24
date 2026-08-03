@@ -33,7 +33,6 @@ export default async function PostDetail({ params }: { params: { category: strin
         <span className="dot">•</span>
         <span>{post.createdAt.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
         <span className="dot">•</span>
-        <span>👁️ {post.views} Views</span>
       </div>
 
       <div className="post-body">
