@@ -8,7 +8,7 @@ UNSPLASH_ACCESS_KEY = os.environ.get("UNSPLASH_ACCESS_KEY")
 DATABASE_URL = os.environ.get("DATABASE_URL")
 
 CATEGORY_NAME = "K-POP"
-SEARCH_QUERY = "K팝"
+SEARCH_QUERY = "아이돌, 가수, 가요, 음악"
 
 # 1️⃣ [신규 추가] DB에서 최근 작성한 글 제목 5개를 가져오는 함수
 def get_recent_titles():
