@@ -24,13 +24,13 @@ a { text-decoration: none; color: inherit; }
 @media (min-width: 1024px) { .ad-sidebar { display: block; background: #e2e8f0; min-height: 600px; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #94a3b8; font-weight: bold; } }
 .main-content { flex: 1; }
 
-/* 📱 블로그 포스트 3열 그리드 (PC 3열, 태블릿 2열, 모바일 1열) */
+/* 📱 메인/목록 블로그 포스트 3열 그리드 */
 .page-title { font-size: 24px; font-weight: 800; margin-bottom: 20px; color: #1e293b; border-left: 4px solid #2563eb; padding-left: 12px; }
 .article-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; }
 @media (max-width: 1024px) { .article-grid { grid-template-columns: repeat(2, 1fr); } }
 @media (max-width: 640px) { .article-grid { grid-template-columns: 1fr; } .header-top { flex-direction: column; gap: 16px; align-items: flex-start; } .search-bar { width: 100%; } }
 
-/* 🃏 개별 기사 카드 디자인 */
+/* 🃏 메인화면 개별 기사 카드 디자인 */
 .article-card { display: flex; flex-direction: column; border-radius: 12px; overflow: hidden; border: 1px solid #e2e8f0; background: #fff; transition: transform 0.2s; }
 .article-card:hover { transform: translateY(-4px); box-shadow: 0 10px 20px rgba(0,0,0,0.05); }
 .image-wrapper { width: 100%; aspect-ratio: 16 / 10; overflow: hidden; background-color: #f1f5f9; }
@@ -52,4 +52,76 @@ a { text-decoration: none; color: inherit; }
 @keyframes spin {
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
+}
+
+
+/* ========================================================
+   🚀 [신규 추가] 상세 페이지(기사 본문) 고급화 디자인 
+   ======================================================== */
+
+.post-detail-container { 
+  max-width: 800px; /* 글을 읽기 가장 편안한 너비인 800px로 제한 */
+  margin: 0 auto; 
+  padding: 20px 0 60px 0; 
+}
+
+.post-category-label { 
+  color: #2563eb; 
+  font-weight: 800; 
+  font-size: 14px; 
+  letter-spacing: 1px; 
+  margin-bottom: 16px; 
+}
+
+/* 기사 제목을 거대하고 압도적으로! */
+.post-title { 
+  font-size: 38px; 
+  font-weight: 900; 
+  color: #0f172a; 
+  line-height: 1.25; 
+  margin-bottom: 24px; 
+  word-break: keep-all; 
+  letter-spacing: -0.5px; 
+}
+
+/* 날짜 및 작성자 정보 여백 넓게 */
+.post-meta { 
+  display: flex; 
+  align-items: center; 
+  flex-wrap: wrap; 
+  gap: 12px; 
+  color: #64748b; 
+  font-size: 15px; 
+  margin-bottom: 40px; 
+  padding-bottom: 24px; 
+  border-bottom: 1px solid #e2e8f0; 
+}
+.post-meta .dot { color: #cbd5e1; }
+
+/* 🚀 본문 가독성 핵심: 글씨 크기 18px, 줄간격 1.9배, 진한 회색 */
+.post-body { 
+  font-size: 18px; 
+  line-height: 1.9; 
+  color: #334155; 
+  letter-spacing: -0.2px; 
+}
+
+/* 문단(p) 사이에 큼직한 여백 추가 */
+.post-body p { 
+  margin-bottom: 32px; 
+}
+
+/* 이미지 모서리를 둥글게, 위아래 여백을 줘서 답답하지 않게 */
+.post-main-image { 
+  width: 100%; 
+  border-radius: 12px; 
+  overflow: hidden; 
+  margin: 40px 0; 
+  background-color: #f1f5f9; 
+}
+.post-main-image img { 
+  width: 100%; 
+  height: auto; 
+  display: block; 
+  object-fit: cover; 
 }
