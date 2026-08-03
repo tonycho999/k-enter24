@@ -30,7 +30,6 @@ export default function RootLayout({ children }: { children: React.ReactNode; })
             </div>
           </header>
 
-// src/app/layout.tsx 의 메뉴 부분 수정
           <nav className="nav-menu">
             <Link href="/k-pop" prefetch={true} className="nav-link">K-POP</Link>
             <Link href="/k-drama" prefetch={true} className="nav-link">K-DRAMA</Link>
