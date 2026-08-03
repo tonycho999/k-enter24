@@ -2,11 +2,9 @@
 import Link from 'next/link';
 import { PrismaClient } from '@prisma/client';
 
-// 🚀 Prisma Client 인스턴스 생성 (DB와 통신하는 일꾼)
 const prisma = new PrismaClient();
-
-// Next.js 14 최신 기능: 이 페이지는 캐시하지 않고 방문할 때마다 최신 DB 글을 보여주도록 설정! (매우 중요⭐️)
 export const dynamic = 'force-dynamic';
+export const revalidate = 60; 
 
 export default async function Home() {
   // 1. Supabase DB에서 최신 글 목록을 가져옵니다. (최신순 정렬)
