@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
-import '@/app/globals.css'; 
-import Sidebar from '@/components/Sidebar'; // Sidebar 경로도 절대 경로로 통일합니다.
+import './globals.css'; // 👈 골치 아픈 절대 경로(@/) 빼고 가장 기본 형태로 원복
+import Sidebar from '../components/Sidebar'; // 👈 Sidebar 경로도 기본 형태로 원복
 
 const inter = Inter({ subsets: ['latin'] });
 
