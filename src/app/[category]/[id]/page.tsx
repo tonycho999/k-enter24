@@ -4,6 +4,7 @@ import { notFound } from 'next/navigation';
 
 const prisma = new PrismaClient();
 export const dynamic = 'force-dynamic';
+export const revalidate = 60;
 
 export default async function PostDetail({ params }: { params: { category: string, id: string } }) {
   // 1. URL에서 전달받은 id(문자열)를 숫자(Int)로 변환합니다.
