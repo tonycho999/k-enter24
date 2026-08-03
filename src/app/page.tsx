@@ -3,43 +3,56 @@ import Link from 'next/link';
 import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
-export const dynamic = 'force-dynamic';
 export const revalidate = 60; 
 
 export default async function Home() {
-  // 1. Supabase DB에서 최신 글 목록을 가져옵니다. (최신순 정렬)
   const posts = await prisma.post.findMany({
     orderBy: { createdAt: 'desc' },
-    // 일단 화면이 꽉 차 보이도록 최근 12개만 가져옵니다.
-    take: 12, 
+    take: 20, // 일단 최신 20개만 가져옵니다.
   });
+
+  // 현재 연도를 구해서 필터 버튼에 사용 (나중에 2027이 되면 자동으로 추가되도록 응용 가능합니다)
+  const currentYear = new Date().getFullYear();
 
   return (
     <div>
-      {/* 2. DB에 글이 아직 하나도 없을 때 보여줄 안내 화면 */}
+      <div className="page-header">
+        <h2 className="page-title">🔥 Trending K-Culture</h2>
+        
+        {/* 🚀 연도별 필터 버튼 (현재 연도만 활성화된 상태로 표시) */}
+        <div className="year-filter">
+          <button className="year-btn active">{currentYear}</button>
+          {/* <button className="year-btn">2025</button> 나중에 데이터가 쌓이면 이렇게 추가 가능합니다 */}
+        </div>
+      </div>
+      
       {posts.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '100px 0', color: '#64748b' }}>
           <h3>아직 등록된 기사가 없습니다.</h3>
         </div>
       ) : (
-        /* 3. DB에서 가져온 글이 있다면 예쁜 카드로 반복해서 그려줍니다! */
-        <div className="article-grid">
+        /* 🚀 가로형 리스트 컨테이너로 변경 */
+        <div className="article-list">
           {posts.map((post) => {
-            // DB의 images 배열에서 첫 번째 이미지를 썸네일로 사용! (이미지가 없으면 기본 회색 배경)
-            const thumbnailUrl = post.images.length > 0 ? post.images[0] : 'https://via.placeholder.com/800x500.png?text=No+Image';
+            const thumbnailUrl = post.images.length > 0 ? post.images[0] : 'https://k-enter24.com/og-image.png';
 
             return (
-              <Link href={`/${post.category.toLowerCase()}/${post.id}`} key={post.id} className="article-card">
-                <div className="image-wrapper">
+              <Link href={`/${post.category.toLowerCase()}/${post.id}`} key={post.id} className="list-card">
+                {/* 왼쪽: 썸네일 (원본 비율 유지하면서 꽉 차게) */}
+                <div className="list-image">
                   <img src={thumbnailUrl} alt={post.title} />
                 </div>
-                <div className="card-content">
-                  <div className="card-category">{post.category.toUpperCase()}</div>
-                  <h3 className="card-title">{post.title}</h3>
-                  {/* content 본문이 너무 길 수 있으니 앞에서부터 100글자만 잘라서 미리보기로 보여줍니다 */}
-                  <p className="card-desc">
-                    {post.content.length > 100 ? post.content.substring(0, 100) + '...' : post.content}
+                
+                {/* 오른쪽: 텍스트 정보 */}
+                <div className="list-content">
+                  <div className="list-category">{post.category.toUpperCase()}</div>
+                  <h3 className="list-title">{post.title}</h3>
+                  <p className="list-desc">
+                    {post.content.length > 150 ? post.content.substring(0, 150) + '...' : post.content}
                   </p>
+                  <div className="list-date">
+                    {post.createdAt.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
+                  </div>
                 </div>
               </Link>
             );
