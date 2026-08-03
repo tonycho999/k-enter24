@@ -30,13 +30,15 @@ export default function RootLayout({ children }: { children: React.ReactNode; })
             </div>
           </header>
 
+// src/app/layout.tsx 의 메뉴 부분 수정
           <nav className="nav-menu">
-            <Link href="/k-pop" className="nav-link">K-POP</Link>
-            <Link href="/k-drama" className="nav-link">K-DRAMA</Link>
-            <Link href="/k-movie" className="nav-link">K-MOVIE</Link>
-            <Link href="/k-entertainment" className="nav-link">K-ENTERTAINMENT</Link>
-            <Link href="/k-culture" className="nav-link">K-CULTURE</Link>
+            <Link href="/k-pop" prefetch={true} className="nav-link">K-POP</Link>
+            <Link href="/k-drama" prefetch={true} className="nav-link">K-DRAMA</Link>
+            <Link href="/k-movie" prefetch={true} className="nav-link">K-MOVIE</Link>
+            <Link href="/k-entertainment" prefetch={true} className="nav-link">K-ENTERTAINMENT</Link>
+            <Link href="/k-culture" prefetch={true} className="nav-link">K-CULTURE</Link>
           </nav>
+
 
           {/* 💰 불러온 상단 광고 부착! */}
           <AdTop />
