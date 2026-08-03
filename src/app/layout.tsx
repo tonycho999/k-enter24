@@ -11,6 +11,9 @@ import AdRight from '../components/AdRight';
 export const metadata: Metadata = {
   title: 'K-ENTER 24 | Global K-Culture Blog',
   description: 'Your daily source for K-Pop, K-Drama, and K-Culture.',
+    verification: {
+    google: 'K7nILRoN2qJRl9Cfvp6tkRkddR_Q9YWz7GSd56MY05Y',
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode; }) {
