@@ -11,7 +11,7 @@ DATABASE_URL = os.environ.get("DATABASE_URL")
 
 CATEGORY_NAME = "K-POP"
 # '가수' 하나만 쓰면 검색 폭이 좁으므로, 더 풍부하게 검색되도록 OR 연산자를 붙였습니다.
-SEARCH_QUERY = "가수 OR 아이돌 OR 걸그룹 OR 보이그룹"
+SEARCH_QUERY = "가수"
 
 # 🚀 [추가] 파이썬이 싫어하는 pgbouncer 글자를 지워주는 공통 함수
 def get_clean_db_url():
