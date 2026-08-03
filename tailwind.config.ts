@@ -2,9 +2,9 @@ import type { Config } from "tailwindcss";
 
 const config: Config = {
   content: [
-    // src 폴더 내부의 모든 컴포넌트와 페이지에서 Tailwind 클래스를 인식하도록 경로 지정
-    "./src/components/**/*.{js,ts,jsx,tsx,mdx}",
-    "./src/app/**/*.{js,ts,jsx,tsx,mdx}",
+    // src/ 를 빼고, 최상단에 있는 app과 components 폴더를 바로 바라보게 수정합니다.
+    "./components/**/*.{js,ts,jsx,tsx,mdx}",
+    "./app/**/*.{js,ts,jsx,tsx,mdx}",
   ],
   theme: {
     extend: {
