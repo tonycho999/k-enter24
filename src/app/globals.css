@@ -1,54 +1,51 @@
 /* src/app/globals.css */
 
-/* ==========================================
-   1. 기본 초기화 및 폰트 세팅
-   ========================================== */
+/* 🚀 1. 기본 세팅 (구글 폰트 & 시스템 폰트 혼합으로 가독성 극대화) */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800;900&display=swap');
 * { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: #f8fafc; color: #0f172a; }
+body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: #f8fafc; color: #0f172a; }
 a { text-decoration: none; color: inherit; }
 
-/* ==========================================
-   2. 매거진 전체 뼈대 (헤더, 메뉴, 광고 등)
-   ========================================== */
+/* 🚀 2. 전체 레이아웃 */
 .magazine-layout { max-width: 1200px; margin: 0 auto; padding: 0 20px; display: flex; flex-direction: column; min-height: 100vh; }
-
 .header-top { display: flex; justify-content: space-between; align-items: center; padding: 24px 0; border-bottom: 1px solid #e2e8f0; }
 .logo { font-size: 28px; font-weight: 900; color: #2563eb; letter-spacing: -1px; }
+
+/* 검색창 */
 .search-bar { display: flex; align-items: center; background: #f1f5f9; border-radius: 8px; padding: 8px 16px; width: 300px; }
 .search-bar input { border: none; background: transparent; outline: none; width: 100%; font-size: 15px; color: #334155; }
 
+/* 메뉴 */
 .nav-menu { display: flex; gap: 32px; padding: 16px 0; border-bottom: 1px solid #e2e8f0; margin-bottom: 24px; overflow-x: auto; white-space: nowrap; }
 .nav-link { font-weight: 700; font-size: 15px; color: #475569; text-transform: uppercase; transition: color 0.2s; }
 .nav-link:hover { color: #2563eb; }
 
+/* 광고 영역 */
 .ad-banner-top { width: 100%; height: 90px; background: #e2e8f0; margin-bottom: 32px; display: flex; align-items: center; justify-content: center; color: #94a3b8; font-size: 14px; font-weight: bold; border-radius: 8px; }
 .content-area-with-ads { display: flex; gap: 24px; flex: 1; }
 .ad-sidebar { width: 160px; display: none; }
 @media (min-width: 1024px) { .ad-sidebar { display: block; background: #e2e8f0; min-height: 600px; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #94a3b8; font-weight: bold; } }
 .main-content { flex: 1; min-width: 0; }
 
-/* 로딩 스피너 애니메이션 */
+/* 로딩 스피너 */
 .spinner { width: 40px; height: 40px; border: 4px solid #f3f4f6; border-top: 4px solid #2563eb; border-radius: 50%; animation: spin 1s linear infinite; }
 @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
-/* ==========================================
-   3. 메인/카테고리 화면 (가로 리스트형 레이아웃 + 연도 필터)
-   ========================================== */
+/* 🚀 3. 메인 화면: 가로 리스트형 (썸네일 크기 폭주 절대 방지!) */
 .page-header { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 24px; border-bottom: 2px solid #1e293b; padding-bottom: 12px; }
 .page-title { font-size: 24px; font-weight: 800; color: #1e293b; margin: 0; border-left: 4px solid #2563eb; padding-left: 12px;}
 
-/* 연도 필터 버튼 */
 .year-filter { display: flex; gap: 8px; }
 .year-btn { background: none; border: 1px solid #cbd5e1; color: #64748b; font-weight: 700; padding: 6px 12px; border-radius: 20px; font-size: 14px; cursor: pointer; transition: all 0.2s; }
 .year-btn:hover { border-color: #2563eb; color: #2563eb; }
 .year-btn.active { background: #1e293b; color: white; border-color: #1e293b; }
 
-/* 가로형 리스트 컨테이너 */
 .article-list { display: flex; flex-direction: column; gap: 24px; }
 .list-card { display: flex; gap: 24px; padding: 16px; border-radius: 12px; background: #fff; border: 1px solid #e2e8f0; transition: all 0.2s; align-items: center; }
 .list-card:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(0,0,0,0.06); border-color: #cbd5e1; }
 
-.list-image { width: 240px; height: 160px; flex-shrink: 0; border-radius: 8px; overflow: hidden; background: #f1f5f9; }
+/* ❗️ 핵심: 메인화면 썸네일 크기 강제 고정 */
+.list-image { width: 240px; height: 160px; min-width: 240px; flex-shrink: 0; border-radius: 8px; overflow: hidden; background: #f1f5f9; display: flex; align-items: center; justify-content: center; }
 .list-image img { width: 100%; height: 100%; object-fit: cover; }
 
 .list-content { flex: 1; display: flex; flex-direction: column; justify-content: center; min-width: 0; }
@@ -57,18 +54,15 @@ a { text-decoration: none; color: inherit; }
 .list-desc { font-size: 15px; color: #475569; line-height: 1.6; margin-bottom: 12px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .list-date { font-size: 13px; color: #94a3b8; font-weight: 600; }
 
-/* 모바일 화면 대응 (화면 좁아지면 위아래 구조로 변경) */
 @media (max-width: 640px) {
   .list-card { flex-direction: column; gap: 16px; padding: 12px; align-items: stretch; }
-  .list-image { width: 100%; height: 200px; }
+  .list-image { width: 100%; min-width: 100%; height: 200px; }
   .page-header { flex-direction: column; align-items: flex-start; gap: 16px; }
   .header-top { flex-direction: column; gap: 16px; align-items: flex-start; } 
   .search-bar { width: 100%; }
 }
 
-/* ==========================================
-   4. 상세 페이지 (기사 본문 고급화 디자인)
-   ========================================== */
+/* 🚀 4. 기사 상세 페이지 (Vogue 매거진 스타일) */
 .post-detail-container { max-width: 800px; margin: 0 auto; padding: 20px 0 60px 0; }
 .post-category-label { color: #2563eb; font-weight: 800; font-size: 14px; letter-spacing: 1px; margin-bottom: 16px; }
 .post-title { font-size: 38px; font-weight: 900; color: #0f172a; line-height: 1.25; margin-bottom: 24px; word-break: keep-all; letter-spacing: -0.5px; }
@@ -79,5 +73,6 @@ a { text-decoration: none; color: inherit; }
 .post-body { font-size: 18px; line-height: 1.9; color: #334155; letter-spacing: -0.2px; }
 .post-body p { margin-bottom: 32px; }
 
-.post-main-image { width: 100%; border-radius: 12px; overflow: hidden; margin: 40px 0; background-color: #f1f5f9; }
-.post-main-image img { width: 100%; height: auto; display: block; object-fit: cover; }
+/* ❗️ 핵심: 상세페이지용 거대 이미지 */
+.post-main-image { width: 100%; border-radius: 12px; overflow: hidden; margin: 40px 0; background-color: #f1f5f9; display: flex; align-items: center; justify-content: center; }
+.post-main-image img { width: 100%; height: auto; max-height: 600px; display: block; object-fit: cover; }
