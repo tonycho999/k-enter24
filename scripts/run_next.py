@@ -11,9 +11,10 @@ SCRIPTS = ["auto_pop.py", "auto_drama.py", "auto_movie.py", "auto_entertainment.
 
 def get_last_successful_category():
     try:
-        conn = psycopg2.connect(DATABASE_URL)
+        # 🚀 파이썬이 싫어하는 글자를 지우고 접속합니다!
+        clean_url = DATABASE_URL.replace("?pgbouncer=true", "")
+        conn = psycopg2.connect(clean_url)
         cur = conn.cursor()
-        # DB에서 가장 마지막으로 성공해서 저장된 글의 카테고리 딱 1개를 가져옵니다.
         cur.execute('SELECT category FROM "Post" ORDER BY "createdAt" DESC LIMIT 1')
         row = cur.fetchone()
         cur.close()
