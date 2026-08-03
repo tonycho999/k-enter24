@@ -1,13 +1,14 @@
 # .github/workflows/auto_post.yml
-name: Auto K-Culture Bot (Hourly Rotation)
+name: Auto K-Culture Bot (1 at a time)
 
 on:
   schedule:
-    - cron: '3 * * * *' # 매 정각마다 1번씩 실행
+    # 1시간마다 1번씩 깨어나서 확인합니다.
+    - cron: '6 * * * *'
   workflow_dispatch:
 
 jobs:
-  run_category_bot:
+  run_single_category:
     runs-on: ubuntu-latest
     steps:
     - name: 체크아웃
@@ -21,9 +22,8 @@ jobs:
     - name: 필수 패키지 설치
       run: pip install requests psycopg2-binary groq google-generativeai
       
-    - name: 시간대별 로테이션 실행
+    - name: 순서에 맞춰 딱 1개만 실행!
       env:
-        # 여기에 사용되는 모든 시크릿 키는 GitHub Repo Settings -> Secrets에 등록되어야 합니다.
         NAVER_CLIENT_ID: ${{ secrets.NAVER_CLIENT_ID }}
         NAVER_CLIENT_SECRET: ${{ secrets.NAVER_CLIENT_SECRET }}
         UNSPLASH_ACCESS_KEY: ${{ secrets.UNSPLASH_ACCESS_KEY }}
@@ -38,25 +38,4 @@ jobs:
         GROQ_API_KEY7: ${{ secrets.GROQ_API_KEY7 }}
         GROQ_API_KEY8: ${{ secrets.GROQ_API_KEY8 }}
       run: |
-        # 현재 시간(UTC)을 구하고 5로 나눈 나머지를 계산
-        HOUR=$(date +'%H')
-        MOD=$(($HOUR % 5))
-        
-        echo "현재 시간(UTC): ${HOUR}시 -> 로테이션 번호: ${MOD}"
-        
-        if [ $MOD -eq 0 ]; then
-          echo "🎶 K-POP 실행"
-          python scripts/auto_pop.py
-        elif [ $MOD -eq 1 ]; then
-          echo "📺 K-DRAMA 실행"
-          python scripts/auto_drama.py
-        elif [ $MOD -eq 2 ]; then
-          echo "🍿 K-MOVIE 실행"
-          python scripts/auto_movie.py
-        elif [ $MOD -eq 3 ]; then
-          echo "🎭 K-ENTERTAINMENT 실행"
-          python scripts/auto_entertainment.py
-        elif [ $MOD -eq 4 ]; then
-          echo "🛒 K-CULTURE 실행"
-          python scripts/auto_culture.py
-        fi
+        python scripts/run_next.py
