@@ -1,5 +1,5 @@
 # scripts/auto_culture.py
-import os, requests, psycopg2, json
+import os, requests, psycopg2, json, random # 🚀 random 추가
 from AI import get_ai_response
 
 NAVER_CLIENT_ID = os.environ.get("NAVER_CLIENT_ID")
@@ -25,7 +25,6 @@ def get_recent_titles():
     except Exception as e:
         return []
 
-# 🚀 뉴스 API가 아니라 쇼핑 API를 찌릅니다. (시간 필터링 안 함!)
 def search_naver_shopping(query, display=15):
     url = f"https://openapi.naver.com/v1/search/shop.json?query={query}&display={display}&sort=sim"
     headers = {"X-Naver-Client-Id": NAVER_CLIENT_ID, "X-Naver-Client-Secret": NAVER_CLIENT_SECRET}
@@ -45,21 +44,22 @@ def extract_trending_product(shop_items, recent_titles):
 
 def main():
     print(f"[{CATEGORY_NAME}] 쇼핑 기반 작업 시작...")
-    
     recent_titles = get_recent_titles()
-    print(f"🧐 최근 작성된 K-CULTURE 글: {recent_titles}")
+    
+    # 🚀 [핵심 해결책] OR 연산을 빼고, 심플한 K-컬처 키워드 풀에서 하나를 랜덤으로 뽑아 찌릅니다.
+    keyword_pool = ["화장품", "간식", "스트릿패션", "굿즈"]
+    search_keyword = random.choice(keyword_pool)
+    print(f"🛒 오늘의 쇼핑 검색 키워드: {search_keyword}")
 
-    # 외국인들이 좋아할 만한 키워드 3개를 섞어서 찌릅니다.
-    shop_items = search_naver_shopping("한국 화장품 OR 한국 간식 OR 올리브영 추천", 20) 
+    shop_items = search_naver_shopping(search_keyword, 20) 
     
     if not shop_items:
-        print("❌ 네이버 쇼핑 API에서 상품을 가져오지 못했습니다.")
-        exit(1) # 강제 에러 처리해서 다음 턴에 다시 돌게 만듭니다.
+        print(f"❌ '{search_keyword}' 검색 결과가 없습니다.")
+        exit(1)
         
     trending_product = extract_trending_product(shop_items, recent_titles)
     print(f"🔥 핫 아이템 (중복 필터링 완료): {trending_product}")
     
-    # 딥다이브: 해당 상품 검색
     deep_items = search_naver_shopping(trending_product, 3)
     
     if not deep_items:
@@ -82,7 +82,6 @@ def main():
     title = article_data.get('title', 'K-Culture Trend')
     content = article_data.get('content', '') + "\n\nTags: " + article_data.get('tags', '')
     
-    # 🚀 쇼핑 아이템은 쇼핑 API가 주는 제품 사진(image)이 최고 화질입니다!
     images = []
     for item in deep_items:
         img_url = item.get('image')
