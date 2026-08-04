@@ -47,7 +47,7 @@ def main():
     recent_titles = get_recent_titles()
     
     # 🚀 [핵심 해결책] OR 연산을 빼고, 심플한 K-컬처 키워드 풀에서 하나를 랜덤으로 뽑아 찌릅니다.
-    keyword_pool = ["화장품", "음식", "스트릿패션", "굿즈"]
+    keyword_pool = ["화장품", "음식", "패션", "기념품"]
     search_keyword = random.choice(keyword_pool)
     print(f"🛒 오늘의 쇼핑 검색 키워드: {search_keyword}")
 
