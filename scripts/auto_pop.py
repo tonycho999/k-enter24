@@ -8,8 +8,11 @@ NAVER_CLIENT_ID = os.environ.get("NAVER_CLIENT_ID")
 NAVER_CLIENT_SECRET = os.environ.get("NAVER_CLIENT_SECRET")
 DATABASE_URL = os.environ.get("DATABASE_URL")
 
+# ==========================================
+# 🛑 카테고리 봇 설정 (다른 파일 복사 시 이 두 줄만 변경하세요)
 CATEGORY_NAME = "K-POP"
-SEARCH_QUERY = "가수"
+SEARCH_QUERY = "가수 OR 아이돌 OR 걸그룹 OR 보이그룹"
+# ==========================================
 
 def get_clean_db_url():
     if DATABASE_URL:
@@ -26,7 +29,6 @@ def get_recent_titles():
         conn.close()
         return [row[0] for row in rows]
     except Exception as e:
-        print(f"DB 조회 에러: {e}")
         return []
 
 def filter_recent_24h_news(news_items):
@@ -41,53 +43,46 @@ def filter_recent_24h_news(news_items):
             continue
     return recent_items
 
-# 1. 네이버 뉴스 검색 API (텍스트 정보 수집용)
 def search_naver_news(query, display=50):
     url = f"https://openapi.naver.com/v1/search/news.json?query={query}&display={display}&sort=date"
     headers = {"X-Naver-Client-Id": NAVER_CLIENT_ID, "X-Naver-Client-Secret": NAVER_CLIENT_SECRET}
     res = requests.get(url, headers=headers)
     return res.json().get('items', [])
 
-# 🚀 2. [신규 핵심] 네이버 이미지 검색 API (사진 수집 전용!)
-def search_naver_images(query, display=3):
-    """
-    언론사 사이트를 뒤지지 않고, 네이버 이미지 검색에 '아이돌 이름 + 고화질'로 직접 검색하여 
-    가장 관련도 높고 깨끗한 이미지를 다이렉트로 가져옵니다.
-    """
-    # filter=large (큰 사이즈), sort=sim (유사도/정확도 순) 옵션으로 퀄리티를 보장합니다.
-    url = f"https://openapi.naver.com/v1/search/image?query={query}&display={display}&sort=sim&filter=large"
-    headers = {"X-Naver-Client-Id": NAVER_CLIENT_ID, "X-Naver-Client-Secret": NAVER_CLIENT_SECRET}
-    
-    try:
-        res = requests.get(url, headers=headers)
-        items = res.json().get('items', [])
-        
-        # 원본 이미지 링크(link)들만 쏙쏙 뽑아냅니다.
-        images = []
-        for item in items:
-            img_url = item.get('link')
-            # 네이버 블로그/카페의 썸네일 등 확실한 이미지만 취합합니다.
-            if img_url and img_url.startswith('http'):
-                images.append(img_url)
-                
-        return images
-    except Exception as e:
-        print(f"⚠️ 네이버 이미지 API 검색 실패: {e}")
-        return []
-
 def extract_trending_entities(news_items, recent_titles):
     titles = [item['title'].replace('<b>', '').replace('</b>', '') for item in news_items]
-    recent_info = f"\n[주의사항: 최근 작성한 기사 제목들]\n{recent_titles}\n위 기사들 내용과 1%라도 겹치는 인물이나 그룹은 무조건 제외하고 완전히 새로운 핫이슈를 골라!" if recent_titles else ""
     
-    system_prompt = f"""너는 트렌드 분석가야. 주어진 뉴스 제목들에서 가장 화제가 되는 특정 인물, 아이돌, 또는 작품 이름 '3개'를 화제성 순으로 찾아.
+    # 🚀 강력한 응급조치 프롬프트 적용: 최근 다룬 인물/주제 절대 중복 불가!
+    recent_info = f"\n[CRITICAL WARNING: 최근 작성 기사 제목]\n{recent_titles}\n위 기사들에 이미 등장한 인물이나 그룹은 1%라도 겹치면 절대 안 돼. 무조건 새로운 인물을 찾아." if recent_titles else ""
+    
+    system_prompt = f"""너는 트렌드 분석가야. 뉴스 제목들에서 가장 화제가 되는 특정 인물/아이돌/그룹을 화제성 순으로 '3개' 찾아줘.
     {recent_info}
     반드시 JSON 형식으로 답변해. 형식: {{"keywords": ["1위인물", "2위인물", "3위인물"]}}"""
     
     response_data = get_ai_response(system_prompt, str(titles))
     return response_data.get('keywords', [SEARCH_QUERY])
 
+# 🚀 [완전 신규 로직] 네이버 공식 이미지 검색 API 사용
+def search_naver_images(keyword, count=3):
+    # 최적의 결과를 위해 검색어 뒤에 "고화질"을 붙여서 검색합니다.
+    search_term = f"{keyword} 고화질"
+    # sort=sim(유사도순), filter=large(큰 사이즈만) 옵션 적용
+    url = f"https://openapi.naver.com/v1/search/image?query={search_term}&display={count}&sort=sim&filter=large"
+    headers = {"X-Naver-Client-Id": NAVER_CLIENT_ID, "X-Naver-Client-Secret": NAVER_CLIENT_SECRET}
+    
+    try:
+        res = requests.get(url, headers=headers)
+        if res.status_code == 200:
+            data = res.json()
+            # 이미지 원본 링크(link)만 쏙 뽑아냅니다.
+            return [item['link'] for item in data.get('items', [])]
+    except Exception as e:
+        print(f"이미지 API 검색 실패: {e}")
+    
+    return []
+
 def main():
-    print(f"[{CATEGORY_NAME}] 작업 시작...")
+    print(f"[{CATEGORY_NAME}] 네이버 이미지 API 연동 작업 시작...")
     
     recent_titles = get_recent_titles()
     print(f"🧐 최근 작성된 기사들: {recent_titles}")
@@ -96,7 +91,7 @@ def main():
     broad_news = filter_recent_24h_news(raw_news)
     
     if not broad_news:
-        print("❌ 24시간 이내 최신 기사가 없어 작업을 종료합니다.")
+        print("❌ 24시간 이내 최신 기사가 없어 종료합니다.")
         exit(1)
         
     trending_entities = extract_trending_entities(broad_news, recent_titles)
@@ -114,27 +109,36 @@ def main():
             print(f"⚠️ [{entity}] 관련 기사가 부족합니다. 다음 후보로 패스!")
             continue
             
-        # 🚀 [변경] 언론사 스크래핑 삭제! 네이버 이미지 API에 "인물이름 + 공식" 으로 검색
-        # 예: "에스파 공식 사진", "방탄소년단 무대 고화질"
-        image_search_keyword = f"{entity} 무대 고화질"
-        images = search_naver_images(image_search_keyword, display=3)
+        # 🚀 [핵심] 언론사 사이트 뒤질 필요 없이, 네이버 API에게 "뉴진스 사진 3장 줘" 하고 즉시 받아옵니다!
+        images = search_naver_images(entity, 3)
         
-        if len(images) < 2:
-            print(f"⚠️ [{entity}] 네이버 이미지 검색 결과가 2장 미만입니다. 다음 후보로 패스!")
+        if not images or len(images) < 2:
+            print(f"⚠️ [{entity}] 네이버 API에서 고화질 사진을 2장 이상 찾지 못했습니다. 다음 후보로 패스!")
             continue 
             
         print(f"🎉 [{entity}] 완벽한 사진 {len(images)}장 확보 성공! 기사 작성을 시작합니다.")
         
         article_contents = "\n".join([f"- {n['title']}: {n['description']}" for n in deep_news])
         system_prompt = """
-        너는 글로벌 K-Culture 매거진의 수석 에디터야. 
-        제공된 뉴스를 바탕으로 해외 팬들이 흥미를 가질 만한 영어 제목과 전문성 있는 영어 본문을 작성해 줘.
-        [규칙]
-        1. 본문의 길이는 반드시 최소 500자 이상, 최대 1500자 이내일 것.
-        2. 본문은 HTML 태그 없이 문단 구분을 위한 줄바꿈(\n\n)만 사용할 것.
-        3. 본문 중간에 자연스럽게 아마존 쇼핑 링크를 삽입해 줘. 형식: "🛒 Find [메인키워드] merch on Amazon: https://www.amazon.com/s?k=[영어키워드]&tag=kculturetrend-20"
-        4. 마지막에 관련된 해시태그 5개를 추가할 것. ('SEO' 등 용어 절대 금지)
-        반드시 JSON 형식으로 답변: {"title": "영어제목", "content": "영어본문", "tags": "태그"}
+너는 글로벌 한국 엔터테인먼트 매거진의 수석 에디터야. 
+제공된 뉴스를 바탕으로 해외 팬들이 흥미를 가질 만한 감각적인 영어 제목과 전문성 있는 영어 본문을 작성해 줘.
+
+[작성 및 분량 규칙]
+1. 본문 분량: 영문 기준 공백 포함 '800자 ~ 1,200자 내외' (최소 600자 이상, 최대 1500자 이내 필수)
+2. 500자 수준의 단편 요약글이 되지 않도록 아래 4단계 구조를 반드시 모두 갖추어 작성할 것:
+   - 1단락: 사건/뉴스 요약 및 해외 팬들의 흥미를 끄는 도입부
+   - 2단락: 상세한 배경 설명 및 이번 소식의 핵심 포인트 (구체적 예시 포함)
+   - 3단락: 글로벌 팬들의 반응 및 엔터 산업에 미칠 영향/의미
+   - 4단락: 향후 일정이나 기대감을 나타내는 맺음말
+3. 본문은 HTML 태그 없이 문단 구분을 위한 줄바꿈(\n\n)만 사용할 것.
+4. 본문의 자연스러운 위치(2~3단락 사이)에 아래 형식의 아마존 상품 검색 링크를 딱 1개 삽입할 것:
+   - 형식: "🛒 Find [메인키워드] merch on Amazon: https://www.amazon.com/s?k=[메인키워드영어]&i=specialty-aps&tag=kculturetrend-20"
+   - 키워드 띄어쓰기는 '+' 기호로 변환할 것 (예: BTS V -> BTS+V)
+5. 글 마지막에 관련 해시태그 5개를 작성할 것 ('SEO' 등 검색/마케팅 관련 용어 절대 금지).
+
+[출력 형식]
+반드시 유효한 JSON 형식으로만 답변할 것 (본문 내 큰따옴표가 들어갈 경우 역슬래시 \" 처리 필수):
+{"title": "영어제목", "content": "영어본문", "tags": "태그"}
         """
         
         article_data = get_ai_response(system_prompt, article_contents)
@@ -157,7 +161,7 @@ def main():
         break 
 
     if not saved_successfully:
-        print("\n❌ 3개의 후보를 모두 뒤졌지만, 조건을 만족하는 이슈가 없어 이번 턴은 포기합니다.")
+        print("\n❌ 3개의 후보를 모두 뒤졌지만, 사진 퀄리티 등을 만족하는 이슈가 없어 포기합니다.")
         exit(1)
 
 if __name__ == "__main__":
