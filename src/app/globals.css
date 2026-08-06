@@ -76,3 +76,46 @@ a { text-decoration: none; color: inherit; }
 /* ❗️ 핵심: 상세페이지용 거대 이미지 */
 .post-main-image { width: 100%; border-radius: 12px; overflow: hidden; margin: 40px 0; background-color: #f1f5f9; display: flex; align-items: center; justify-content: center; }
 .post-main-image img { width: 100%; height: auto; max-height: 800px; display: block; object-fit: cover; object-position: top; }
+
+/* ========================================================
+   🚀 아마존 제휴 마케팅 배너 디자인 
+   ======================================================== */
+.amazon-banner-wrapper {
+  margin: 48px 0;
+  display: flex;
+  justify-content: center;
+}
+
+.amazon-banner-btn {
+  display: inline-flex;
+  align-items: center;
+  background-color: #ff9900; /* 아마존 시그니처 오렌지/옐로우 컬러 */
+  color: #111827 !important;
+  padding: 16px 32px;
+  border-radius: 50px; /* 세련된 둥근 버튼 */
+  font-weight: 800;
+  font-size: 18px;
+  text-decoration: none;
+  box-shadow: 0 8px 20px rgba(255, 153, 0, 0.25);
+  transition: all 0.2s ease;
+  max-width: 90%;
+}
+
+.amazon-banner-btn:hover {
+  background-color: #e68a00;
+  transform: translateY(-3px);
+  box-shadow: 0 12px 24px rgba(255, 153, 0, 0.35);
+}
+
+.amazon-icon {
+  font-size: 24px;
+  margin-right: 12px;
+}
+
+.amazon-text {
+  /* 글씨가 너무 길면 줄임표 처리 */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
