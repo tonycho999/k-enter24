@@ -3,7 +3,7 @@ import { PrismaClient } from '@prisma/client';
 import { notFound } from 'next/navigation';
 
 const prisma = new PrismaClient();
-export const revalidate = 3600; // 1시간 캐시
+export const revalidate = 3600;
 
 export default async function PostDetail({ params }: { params: { category: string, id: string } }) {
   const postId = parseInt(params.id, 10);
@@ -15,7 +15,6 @@ export default async function PostDetail({ params }: { params: { category: strin
 
   if (!post) { notFound(); }
 
-  // 🚀 AI가 준 본문을 엔터(\n) 기준으로 완벽하게 쪼개서 배열로 만듭니다.
   const paragraphs = post.content.split(/\n+/).filter(p => p.trim() !== '');
 
   return (
@@ -33,36 +32,56 @@ export default async function PostDetail({ params }: { params: { category: strin
         <span className="dot">•</span>
         <span>{post.createdAt.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
         <span className="dot">•</span>
+        <span>👁️ {post.views} Views</span>
       </div>
 
       <div className="post-body">
-        {/* 메인 이미지 */}
         {post.images && post.images.length > 0 && (
           <div className="post-main-image">
             <img src={post.images[0]} alt="Article Main Image" />
           </div>
         )}
 
-        {/* 문단을 순서대로 뿌려주고, 중간에 이미지를 끼워 넣습니다 */}
-        {paragraphs.map((paragraph, index) => (
-          <div key={index}>
-            <p>{paragraph}</p>
+        {paragraphs.map((paragraph, index) => {
+          // 🚀 [핵심 추가] 아마존 링크가 포함된 문단인지 감지합니다!
+          if (paragraph.toLowerCase().includes('amazon.com')) {
+            // 정규식으로 'https://...' 주소만 쏙 뽑아냅니다.
+            const urlMatch = paragraph.match(/(https?:\/\/[^\s]+)/);
+            const url = urlMatch ? urlMatch[0] : '#';
             
-            {/* 문단 2개가 끝난 지점에 두 번째 사진 삽입 */}
-            {index === 1 && post.images && post.images.length > 1 && (
-              <div className="post-main-image">
-                <img src={post.images[1]} alt="Sub Image 1" />
+            // 주소와 🛒 기호를 제외한 나머지 안내 문구만 뽑아냅니다.
+            const btnText = paragraph.replace(/(https?:\/\/[^\s]+)/, '').replace('🛒', '').trim() || 'Buy on Amazon';
+
+            return (
+              <div key={index} className="amazon-banner-wrapper">
+                <a href={url} target="_blank" rel="noopener noreferrer" className="amazon-banner-btn">
+                  <span className="amazon-icon">🛒</span>
+                  <span className="amazon-text">{btnText}</span>
+                </a>
               </div>
-            )}
-            
-            {/* 문단 4개가 끝난 지점에 세 번째 사진 삽입 */}
-            {index === 3 && post.images && post.images.length > 2 && (
-              <div className="post-main-image">
-                <img src={post.images[2]} alt="Sub Image 2" />
-              </div>
-            )}
-          </div>
-        ))}
+            );
+          }
+
+          return (
+            <div key={index}>
+              {/* 일반 문단은 그대로 출력 */}
+              <p>{paragraph}</p>
+              
+              {/* 문단 사이에 서브 이미지 삽입 */}
+              {index === 1 && post.images && post.images.length > 1 && (
+                <div className="post-main-image">
+                  <img src={post.images[1]} alt="Sub Image 1" />
+                </div>
+              )}
+              
+              {index === 3 && post.images && post.images.length > 2 && (
+                <div className="post-main-image">
+                  <img src={post.images[2]} alt="Sub Image 2" />
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
     </article>
   );
