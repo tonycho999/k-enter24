@@ -11,7 +11,7 @@ DATABASE_URL = os.environ.get("DATABASE_URL")
 # ==========================================
 # 🛑 카테고리 봇 설정 (다른 파일 복사 시 이 두 줄만 변경하세요)
 CATEGORY_NAME = "K-POP"
-SEARCH_QUERY = "가수"
+SEARCH_QUERY = "k-pop"
 # ==========================================
 
 def get_clean_db_url():
