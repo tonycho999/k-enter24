@@ -2,13 +2,9 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import './globals.css';
-
-// 광고 부품들 불러오기
 import AdTop from '../components/AdTop';
 import AdLeft from '../components/AdLeft';
 import AdRight from '../components/AdRight';
-
-// 🚀 진짜 검색창 부품 불러오기
 import SearchBar from '../components/SearchBar';
 
 // 🚀 구글 서치콘솔 소유권 확인 태그 (SEO 핵심)
@@ -17,6 +13,17 @@ export const metadata: Metadata = {
   description: 'Your daily source for K-Pop, K-Drama, and K-Culture.',
   verification: {
     google: 'K7nILRoN2qJRl9Cfvp6tkRkddR_Q9YWz7GSd56MY05Y',
+  },
+  robots: {
+    index: true,     // 구글에 이 페이지를 등록해라
+    follow: true,    // 이 페이지에 있는 링크(기사들)도 다 따라가서 수집해라
+    googleBot: {
+      index: true,
+      follow: true,
+      'max-video-preview': -1,
+      'max-image-preview': 'large', // 사진을 고화질로 긁어가서 구글 이미지 검색에 크게 띄워라
+      'max-snippet': -1,            // 글 내용도 제한 없이 다 긁어가라
+    },
   },
 };
 
