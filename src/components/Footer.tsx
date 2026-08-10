@@ -16,12 +16,12 @@ export default function Footer() {
     }}>
       <div style={{ maxWidth: '1200px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '16px' }}>
         
-        {/* 필수 정책 링크들 */}
+        {/* 필수 정책 링크들 (hover 에러 해결 완료) */}
         <div style={{ display: 'flex', justifyContent: 'center', gap: '24px', flexWrap: 'wrap' }}>
-          <Link href="/about" style={{ hover: { color: '#2563eb' } }}>About Us</Link>
-          <Link href="/privacy" style={{ hover: { color: '#2563eb' } }}>Privacy Policy</Link>
-          <Link href="/terms" style={{ hover: { color: '#2563eb' } }}>Terms of Service</Link>
-          <Link href="/contact" style={{ hover: { color: '#2563eb' } }}>Contact</Link>
+          <Link href="/about" className="footer-link">About Us</Link>
+          <Link href="/privacy" className="footer-link">Privacy Policy</Link>
+          <Link href="/terms" className="footer-link">Terms of Service</Link>
+          <Link href="/contact" className="footer-link">Contact</Link>
         </div>
 
         {/* 저작권 명시 */}
