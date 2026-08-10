@@ -1,12 +1,11 @@
 # scripts/auto_pop.py
-import os, requests, psycopg2, random, uuid
+import os, requests, psycopg2, random, uuid, re
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
 from io import BytesIO
 from PIL import Image
 from supabase import create_client, Client
-# 🚀 AI.py에서 검열 함수도 함께 불러옵니다!
-from AI import get_ai_response, verify_category_fit 
+from AI import get_ai_response, verify_category_fit
 
 # 🔑 환경변수 세팅
 NAVER_CLIENT_ID = os.environ.get("NAVER_CLIENT_ID")
@@ -68,8 +67,8 @@ def search_naver_images(keyword, count=3):
         print(f"⚠️ 네이버 이미지 API 검색 실패: {e}")
     return []
 
-# 🗄️ 이미지를 WebP로 압축하여 Supabase에 영구 보존!
-def upload_image_to_supabase(img_url):
+# 🗄️ 🚀 [업그레이드] 이미지 파일명을 SEO 친화적(kpop-keyword-uuid.webp)으로 변경하여 업로드!
+def upload_image_to_supabase(img_url, entity_keyword, category):
     try:
         headers = {'User-Agent': 'Mozilla/5.0 Chrome/120.0.0.0 Safari/537.36'}
         res = requests.get(img_url, headers=headers, timeout=5)
@@ -85,7 +84,15 @@ def upload_image_to_supabase(img_url):
         output_buffer = BytesIO()
         img.save(output_buffer, format='WebP', quality=80)
         
-        file_name = f"{uuid.uuid4().hex}.webp"
+        # SEO를 위한 파일명 정제 (영문, 숫자만 남기고 띄어쓰기는 하이픈으로)
+        # 만약 한글(예: 뉴진스)이라 다 지워지면 카테고리명만 씁니다.
+        clean_keyword = re.sub(r'[^a-zA-Z0-9]', '', entity_keyword).lower()
+        if not clean_keyword: 
+            clean_keyword = category.lower().replace("-", "")
+            
+        short_uuid = uuid.uuid4().hex[:6]
+        file_name = f"{category.lower().replace('-', '')}-{clean_keyword}-{short_uuid}.webp"
+        
         supabase.storage.from_("images").upload(
             path=file_name,
             file=output_buffer.getvalue(),
@@ -129,19 +136,19 @@ def main():
         
         article_contents = "\n".join([f"- {n['title']}: {n['description']}" for n in deep_news])
         
-        # 🛡️ [핵심] AI 편집장의 카테고리 순수성 검열! (예능 출연 기사 등 차단)
+        # 🛡️ AI 편집장의 카테고리 순수성 검열 (예능 출연 기사 등 차단)
         is_valid = verify_category_fit(CATEGORY_NAME, entity, article_contents)
         if not is_valid:
             print(f"⚠️ [{entity}] 이슈는 순수 '{CATEGORY_NAME}' 성격에 맞지 않아(예능/가십 등) 반려되었습니다. 패스!")
             continue 
 
-        # 검열 통과 시 이미지 탐색 및 업로드 시작
         raw_images = search_naver_images(entity, 3)
         if len(raw_images) < 2: continue 
             
         safe_images = []
         for img_url in raw_images:
-            safe_url = upload_image_to_supabase(img_url)
+            # 🚀 [업그레이드] 이미지 업로드 시 키워드와 카테고리를 넘겨 SEO 파일명을 만듭니다!
+            safe_url = upload_image_to_supabase(img_url, entity, CATEGORY_NAME)
             if safe_url: safe_images.append(safe_url)
             
         if len(safe_images) < 2: 
@@ -156,21 +163,27 @@ def main():
         max_len = target_length + 100
         print(f"📝 타겟 글자 수: {min_len} ~ {max_len}자")
         
+        # 🚀 [업그레이드] 구글 SEO 및 AI 검색(AEO)에 완벽하게 최적화된 프롬프트!
         system_prompt = f"""
-        너는 글로벌 K-Culture 매거진의 수석 에디터야. 
-        뉴스를 바탕으로 해외 팬들이 흥미를 가질 만한 영어 제목과 전문적인 영어 본문을 작성해.
-        [규칙]
-        1. 본문 길이는 최소 {min_len}자, 최대 {max_len}자 이내로 엄격하게 맞출 것!
-        2. HTML 태그 없이 줄바꿈(\n\n)만 사용할 것.
-        3. 마지막에 해시태그 5개를 추가할 것. ('SEO' 절대 금지)
-        JSON 형식 답변: {{"title": "영어제목", "content": "영어본문", "tags": "태그"}}
+        너는 글로벌 K-Culture 매거진의 최고참 SEO/AEO 전문가 겸 수석 에디터야.
+        주어진 뉴스를 바탕으로 영어 기사를 작성하되, 아래의 [최적화 규칙]을 무조건 지켜.
+
+        [최적화 규칙]
+        1. 분량: 최소 {min_len}자 ~ 최대 {max_len}자.
+        2. 제목(Title): 핵심 키워드가 맨 앞에 오도록 하고, 어그로가 아닌 명확한 정보성(Who, What)을 띌 것.
+        3. 도입부(Hook): 첫 문단(50단어 이내)에 기사의 핵심 요약(Core Answer)을 넣어, AI 검색 엔진이 즉시 긁어갈 수 있게 만들 것.
+        4. 본문 구조(Formatting): 가독성을 위해 반드시 2개 이상의 소제목(Subheading)을 사용할 것. 소제목은 대문자로 시작하며, 소제목 앞뒤로는 반드시 빈 줄(\\n\\n)을 넣을 것.
+        5. 정보의 깊이: 단순히 "유행이다"가 아니라, 구체적인 이유(Why)와 데이터/팬 반응을 포함할 것.
+        6. 본문은 HTML 태그를 절대 쓰지 말고 오직 줄바꿈(\\n\\n)으로만 문단을 나눌 것.
+        7. 마지막에 관련 해시태그 5개 추가. ('SEO' 등 용어 절대 금지)
+        
+        반드시 JSON 형식으로 답변: {{"title": "영어제목", "content": "영어본문", "tags": "태그"}}
         """
         
         article_data = get_ai_response(system_prompt, article_contents)
         title = article_data.get('title', f'{entity} Update')
         content = article_data.get('content', '') + "\n\nTags: " + article_data.get('tags', '')
         
-        # 완성된 기사 DB 저장
         conn = psycopg2.connect(get_clean_db_url())
         cur = conn.cursor()
         cur.execute(
@@ -182,12 +195,12 @@ def main():
         cur.close()
         conn.close()
         
-        print(f"✅ [{entity}] K-POP 순수 기사 완벽 작성 및 DB 저장 완료!")
+        print(f"✅ [{entity}] K-POP SEO/AEO 최적화 기사 완벽 작성 및 DB 저장 완료!")
         saved_successfully = True
         break 
 
     if not saved_successfully:
-        print("\n❌ 3개의 후보 모두 조건(카테고리 일치, 사진 퀄리티 등) 미달로 포기합니다.")
+        print("\n❌ 3개의 후보 모두 조건 미달로 이번 턴은 포기합니다.")
         exit(1)
 
 if __name__ == "__main__":
