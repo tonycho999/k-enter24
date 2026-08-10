@@ -119,3 +119,7 @@ a { text-decoration: none; color: inherit; }
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
+
+/* 푸터 링크 호버 효과 */
+.footer-link { transition: color 0.2s; }
+.footer-link:hover { color: #2563eb; }
