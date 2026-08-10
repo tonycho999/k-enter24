@@ -112,3 +112,36 @@ def get_ai_response(system_prompt, user_content):
             print(f"❌ Gemini마저 실패했습니다: {e}")
     
     raise Exception("모든 AI API 호출에 실패했습니다.")
+
+# scripts/AI.py 파일 맨 아래에 추가
+
+def verify_category_fit(category_name, entity, article_contents):
+    """
+    AI에게 이 기사 내용이 해당 카테고리의 '본질'에 맞는지 검증받습니다.
+    """
+    # 카테고리별 엄격한 판단 기준
+    criteria = {
+        "K-POP": "음악, 앨범 발매, 콘서트, 무대, 차트 성적, 음악 방송 등 순수 음악 활동",
+        "K-DRAMA": "드라마 캐스팅, 방영 소식, 시청률, 줄거리, 작품 속 연기",
+        "K-MOVIE": "영화 개봉, 박스오피스, 영화제, 무대인사, 영화 촬영",
+        "K-ENTERTAINMENT": "예능 프로그램 출연, 관찰 예능, 토크쇼, 유튜버/BJ 방송 활동",
+        "K-CULTURE": "뷰티, 패션, 식품, 팝업스토어, 여행지, 라이프스타일 트렌드"
+    }
+    
+    criterion = criteria.get(category_name, "해당 카테고리")
+    
+    system_prompt = f"""너는 K-Culture 매거진의 깐깐한 편집장이야. 
+    기자가 [{entity}]에 대한 기사를 [{category_name}] 카테고리에 올리려고 해.
+    [{category_name}] 카테고리의 올바른 기준은 오직 [{criterion}]와 관련된 이슈여야 해.
+    
+    만약 기사 내용이 이 기준과 안 맞고, 단순히 예능 출연, 가십, 열애설, 타 분야 활동(가수가 연기함) 등이라면 가차 없이 반려(False)해야 해.
+    기사 요약을 읽어보고, 이 기사가 [{category_name}]에 완벽하게 부합하면 "true", 조금이라도 성격이 다르면 "false"로만 대답해.
+    반드시 JSON 형식으로 답변: {{"is_valid": true 또는 false}}
+    """
+    
+    try:
+        response_data = get_ai_response(system_prompt, article_contents)
+        return response_data.get('is_valid', False)
+    except Exception as e:
+        print(f"카테고리 검증 중 에러: {e}")
+        return False # 에러 나면 안전하게 버림
