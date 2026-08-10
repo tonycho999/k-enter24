@@ -6,6 +6,7 @@ import AdTop from '../components/AdTop';
 import AdLeft from '../components/AdLeft';
 import AdRight from '../components/AdRight';
 import SearchBar from '../components/SearchBar';
+import Footer from '../components/Footer'; 
 
 // 🚀 구글 서치콘솔 소유권 확인 태그 (SEO 핵심)
 export const metadata: Metadata = {
@@ -69,7 +70,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <AdRight />
             
           </div>
-
+          <Footer />
         </div>
       </body>
     </html>
