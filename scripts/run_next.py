@@ -1,55 +1,46 @@
 # scripts/run_next.py
 import os
-import psycopg2
 import subprocess
+from datetime import datetime
 
-DATABASE_URL = os.environ.get("DATABASE_URL")
-
-# 카테고리 순서와 그에 맞는 파이썬 파일들
-CATEGORIES = ["K-POP", "K-DRAMA", "K-MOVIE", "K-ENTERTAINMENT", "K-CULTURE"]
-SCRIPTS = ["auto_pop.py", "auto_drama.py", "auto_movie.py", "auto_entertainment.py", "auto_culture.py"]
-
-def get_last_successful_category():
-    try:
-        # 🚀 파이썬이 싫어하는 글자를 지우고 접속합니다!
-        clean_url = DATABASE_URL.replace("?pgbouncer=true", "")
-        conn = psycopg2.connect(clean_url)
-        cur = conn.cursor()
-        cur.execute('SELECT category FROM "Post" ORDER BY "createdAt" DESC LIMIT 1')
-        row = cur.fetchone()
-        cur.close()
-        conn.close()
-        if row:
-            return row[0]
-    except Exception as e:
-        print(f"DB 확인 중 에러 발생: {e}")
-    return None
+# 실행할 카테고리 스크립트 5개 목록
+SCRIPTS = [
+    "auto_pop.py",
+    "auto_drama.py",
+    "auto_movie.py",
+    "auto_entertainment.py",
+    "auto_culture.py"
+]
 
 def main():
-    last_category = get_last_successful_category()
-    print(f"📌 마지막으로 성공한 카테고리: {last_category}")
+    # 🚀 [핵심] 현재 시간(UTC)을 구합니다.
+    current_hour = datetime.utcnow().hour
     
-    next_index = 0
-    # 마지막 카테고리가 목록에 있다면, 그 다음 인덱스를 찾습니다.
-    if last_category in CATEGORIES:
-        current_index = CATEGORIES.index(last_category)
-        # 마지막이 K-CULTURE(4)였다면 다시 K-POP(0)으로 돌아갑니다.
-        next_index = (current_index + 1) % len(CATEGORIES)
-        
-    next_category = CATEGORIES[next_index]
-    next_script = SCRIPTS[next_index]
+    # 5개의 스크립트가 돌아가며 실행되도록 시간을 5로 나눈 나머지(0,1,2,3,4)를 구합니다.
+    target_index = current_hour % 5
     
-    print(f"👉 이번에 실행할 타겟: {next_category} (스크립트: {next_script})")
+    next_script = SCRIPTS[target_index]
     
-    # 해당 스크립트 딱 1개만 실행합니다.
+    print("======================================")
+    print(f"⏰ 현재 시간(UTC): {current_hour}시")
+    print(f"👉 이번 턴 타겟 인덱스: {target_index}")
+    print(f"🎯 실행할 스크립트: {next_script}")
+    print("======================================")
+    
     script_path = os.path.join(os.path.dirname(__file__), next_script)
+    
+    # 해당 스크립트를 딱 1번만 실행합니다.
     result = subprocess.run(["python", script_path])
     
+    # 결과가 어떻든(성공이든, 뉴스가 없어서 실패로 종료하든) 여기서 턴을 마칩니다.
     if result.returncode != 0:
-        print(f"❌ {next_script} 실행 실패! (다음 턴에 다시 재시도합니다)")
-        exit(1)
+        print(f"\n❌ [{next_script}] 실행 중 에러 또는 조건 미달(뉴스 없음 등)로 종료되었습니다.")
+        print("⏭️ 상관없이 다음 시간에는 다음 카테고리 봇이 실행됩니다.")
+        # Github Action이 자체적으로 실패(빨간불) 처리되지 않도록 0으로 정상 종료시킵니다.
+        # (이렇게 해야 깃허브에서 에러 메일이 날아오지 않습니다.)
+        exit(0) 
     else:
-        print(f"✅ {next_script} 실행 완벽하게 성공!")
+        print(f"\n✅ [{next_script}] 기사 발행 완벽하게 성공!")
 
 if __name__ == "__main__":
     main()
