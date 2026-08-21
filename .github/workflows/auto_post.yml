@@ -2,9 +2,9 @@
 name: Auto K-Culture Bot (1 at a time)
 
 on:
-#  schedule:
+  schedule:
     # 1시간마다 1번씩 깨어나서 확인합니다.
-#    - cron: '6 * * * *'
+    - cron: '6 * * * *'
   workflow_dispatch:
 
 jobs:
