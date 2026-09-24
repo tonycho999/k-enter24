@@ -1,15 +1,16 @@
 // 3. 검색어로 글 찾기
 export async function searchPosts(keyword: string): Promise<BlogPost[]> {
-  // Blogger 주소에 ?q=검색어 를 붙이면 알아서 제목과 본문에서 검색해 줍니다.
-  const url = `${process.env.BLOGGER_URL || 'https://본인블로그주소.blogspot.com'}/feeds/posts/default?q=${encodeURIComponent(keyword)}&alt=json&max-results=20`;
+  // 상단에 선언해둔 BLOG_URL 상수를 깔끔하게 재사용합니다.
+  const url = `${BLOG_URL}/feeds/posts/default?q=${encodeURIComponent(keyword)}&alt=json&max-results=20`;
 
   try {
-    // 검색 결과는 실시간성이 중요하므로 캐시하지 않음 (cache: 'no-store')
     const res = await fetch(url, { cache: 'no-store' });
-    if (!res.ok) return [];
+    if (!res.ok) throw new Error('Search API failed');
+    
     const data = await res.json();
-
-    const entries = data.feed.entry || [];
+    
+    // 검색 결과가 아예 없을 경우 에러가 나지 않도록 feed?.entry 로 안전하게 접근합니다.
+    const entries = data.feed?.entry || []; 
 
     return entries.map((entry: any) => {
       const rawId = entry.id.$t;
@@ -25,13 +26,14 @@ export async function searchPosts(keyword: string): Promise<BlogPost[]> {
       return {
         id,
         title: entry.title.$t,
-        content: entry.content.$t,
+        content: entry.content?.$t || '', // 내용이 비어있는 글 방어코드
         publishedAt: entry.published.$t,
         thumbnail,
         categories,
       };
     });
   } catch (error) {
-    return [];
+    console.error('Blogger Search Error:', error);
+    return []; // 에러가 나면 사이트가 터지지 않고 그냥 '결과 없음' 화면을 띄워줍니다.
   }
 }
