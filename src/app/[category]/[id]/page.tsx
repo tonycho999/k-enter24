@@ -1,100 +1,66 @@
 // src/app/[category]/[id]/page.tsx
-import { PrismaClient } from '@prisma/client';
 import { notFound } from 'next/navigation';
+import { getPostById } from '../../../lib/blogger';
+import { Metadata } from 'next';
 
-const prisma = new PrismaClient();
+// 🚀 기사별 동적 SEO 메타데이터 생성 (공유 시 썸네일, 제목 자동 지정)
+export async function generateMetadata({ params }: { params: { id: string, category: string } }): Promise<Metadata> {
+  const post = await getPostById(params.id);
+  
+  if (!post) {
+    return { title: 'Post Not Found | K-ENTER 24' };
+  }
 
-export const revalidate = 3600;
+  const plainTextContent = post.content.replace(/<[^>]*>?/gm, '').substring(0, 160);
 
-export default async function PostDetail({ params }: { params: { category: string, id: string } }) {
-  const postId = parseInt(params.id, 10);
+  return {
+    title: `${post.title} | K-ENTER 24`,
+    description: plainTextContent,
+    openGraph: {
+      title: post.title,
+      description: plainTextContent,
+      images: [post.thumbnail || 'https://k-enter24.com/og-image.png'],
+    },
+  };
+}
 
-  if (isNaN(postId)) { notFound(); }
+export default async function PostDetailPage({ params }: { params: { id: string, category: string } }) {
+  // 1. Blogger에서 해당 ID의 글 불러오기
+  const post = await getPostById(params.id);
 
-  const post = await prisma.post.findUnique({
-    where: { id: postId },
-  });
-
-  if (!post) { notFound(); }
-
-  // 💡 [수정] 실제 줄바꿈(\n)뿐만 아니라 텍스트로 들어간 리터럴 '\n'도 함께 분리하도록 정규식 개선
-  const paragraphs = post.content.split(/(?:\r?\n|\\n)+/).filter(p => p.trim() !== '');
+  // 글이 없으면 404 Not Found 페이지로 이동
+  if (!post) {
+    notFound();
+  }
 
   return (
     <article className="post-detail-container">
-      <div className="post-category-label">
-        {post.category.toUpperCase()}
-      </div>
-      <h1 className="post-title">
-        {post.title}
-      </h1>
-      <div className="post-meta">
-        <span>By K-ENTER 24 Editor</span>
-        <span className="dot">•</span>
-        <span>{post.createdAt.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
-        <span className="dot">•</span>
-        <span>👁️ {post.views} Views</span>
-      </div>
+      {/* 🚀 상단 헤더: 대형 제목, 카테고리, 날짜 */}
+      <header className="post-header" style={{ marginBottom: '30px', borderBottom: '2px solid #000', paddingBottom: '20px' }}>
+        <div style={{ color: '#ef4444', fontWeight: 'bold', marginBottom: '10px', textTransform: 'uppercase' }}>
+          {params.category.replace('-', ' ')}
+        </div>
+        <h1 style={{ fontSize: '2.5rem', fontWeight: '900', lineHeight: '1.2', marginBottom: '15px' }}>
+          {post.title}
+        </h1>
+        <time style={{ color: '#64748b', fontSize: '0.95rem' }}>
+          {new Date(post.publishedAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
+        </time>
+      </header>
 
-      <div className="post-body">
-        {/* 메인 이미지 */}
-        {post.images && post.images.length > 0 && (
-          <div className="post-main-image">
-            <img src={post.images[0]} alt="Article Main Image" />
-          </div>
-        )}
-
-        {paragraphs.map((paragraph, index) => {
-          // 🚀 [수정] 아마존 링크가 포함된 문단 처리
-          if (paragraph.toLowerCase().includes('amazon.com')) {
-            const urlMatch = paragraph.match(/(https?:\/\/[^\s]+)/);
-            const url = urlMatch ? urlMatch[0] : '#';
-            
-            // URL과 🛒 기호를 제거한 나머지 문장 (일반 텍스트용)
-            const remainingText = paragraph
-              .replace(/(https?:\/\/[^\s]+)/, '')
-              .replace(/🛒/g, '')
-              .trim();
-
-            return (
-              <div key={index}>
-                {/* 만약 링크 외에 다른 텍스트(설명글)가 있다면 버튼 위에 일반 문단으로 먼저 출력 */}
-                {remainingText && (
-                  <p>{remainingText}</p>
-                )}
-                
-                {/* 아마존 버튼은 독립된 영역으로만 출력 */}
-                <div className="amazon-banner-wrapper">
-                  <a href={url} target="_blank" rel="noopener noreferrer" className="amazon-banner-btn">
-                    <span className="amazon-icon">🛒</span>
-                    <span className="amazon-text">Buy on Amazon</span>
-                  </a>
-                </div>
-              </div>
-            );
-          }
-
-          return (
-            <div key={index}>
-              {/* 일반 문단은 그대로 출력 */}
-              <p>{paragraph}</p>
-              
-              {/* 문단 사이에 서브 이미지 삽입 */}
-              {index === 1 && post.images && post.images.length > 1 && (
-                <div className="post-main-image">
-                  <img src={post.images[1]} alt="Sub Image 1" />
-                </div>
-              )}
-              
-              {index === 3 && post.images && post.images.length > 2 && (
-                <div className="post-main-image">
-                  <img src={post.images[2]} alt="Sub Image 2" />
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
+      {/* 🚀 본문 영역: Blogger에서 작성한 HTML이 그대로 렌더링 됩니다. */}
+      {/* 기획하신 '18px 폰트 및 1.9 줄간격의 가독성 높은 매거진 스타일'을 인라인 스타일로 적용 */}
+      <div 
+        className="post-content"
+        style={{ 
+          fontSize: '18px', 
+          lineHeight: '1.9', 
+          color: '#333',
+          wordBreak: 'keep-all'
+        }}
+        dangerouslySetInnerHTML={{ __html: post.content }} 
+      />
+      
     </article>
   );
 }
