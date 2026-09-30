@@ -1,17 +1,37 @@
 // src/app/page.tsx
 import Link from 'next/link';
-// 1. Prisma 대신 우리가 만든 Blogger 유틸리티 함수를 불러옵니다.
-import { getPosts } from '../lib/blogger';
+// 절대 경로를 사용하여 에러를 방지합니다.
+import { getPosts } from '@/lib/blogger';
 
 export default async function Home() {
-  // 2. Blogger API에서 최신 글(최대 20개)을 가져옵니다.
+  // Blogger API에서 최신 글(최대 20개)을 가져옵니다.
   const posts = await getPosts();
-
   const currentYear = new Date().getFullYear();
 
-  // Blogger 본문(HTML)에서 순수 텍스트만 추출하는 함수 (요약 텍스트용)
-  const stripHtml = (html: string) => {
-    return html.replace(/<[^>]*>?/gm, '');
+  // 🚀 Blogger 본문 내의 JSON-LD에서 description 추출 (가장 깔끔한 방법)
+  const extractDescription = (html: string) => {
+    if (!html) return '';
+
+    try {
+      const scriptMatch = html.match(/<script[^>]*type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/i);
+      if (scriptMatch && scriptMatch[1]) {
+        const jsonData = JSON.parse(scriptMatch[1]);
+        if (jsonData && jsonData.description) {
+          // JSON 안에 description이 있으면 바로 반환
+          return jsonData.description; 
+        }
+      }
+    } catch (e) {
+      console.error("JSON parsing error in extractDescription", e);
+    }
+
+    // JSON-LD가 없거나 파싱에 실패했을 경우를 위한 방어 코드 (순수 텍스트 150자 추출)
+    let text = html.replace(/<(script|style)[^>]*>[\s\S]*?<\/\1>/gi, '');
+    text = text.replace(/<[^>]*>?/gm, '');
+    text = text.replace(/&nbsp;/g, ' ').replace(/&quot;/g, '"').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>');
+    text = text.trim();
+    
+    return text.length > 150 ? text.substring(0, 150) + '...' : text;
   };
 
   return (
@@ -19,7 +39,7 @@ export default async function Home() {
       <div className="page-header">
         <h2 className="page-title">🔥 Trending K-Culture</h2>
         
-        {/* 🚀 연도별 필터 버튼 (현재 연도만 활성화된 상태로 표시) */}
+        {/* 연도별 필터 버튼 */}
         <div className="year-filter">
           <button className="year-btn active">{currentYear}</button>
         </div>
@@ -30,16 +50,13 @@ export default async function Home() {
           <h3>아직 등록된 기사가 없습니다.</h3>
         </div>
       ) : (
-        /* 🚀 가로형 리스트 컨테이너 */
         <div className="article-list">
           {posts.map((post) => {
-            // 3. 썸네일, 카테고리, 텍스트 가공
             const thumbnailUrl = post.thumbnail || 'https://k-enter24.com/og-image.png';
-            
-            // Blogger는 카테고리(라벨)가 여러 개일 수 있으므로 첫 번째 값을 메인으로 사용. 없을 경우 'news'
             const category = post.categories && post.categories.length > 0 ? post.categories[0] : 'news';
             
-            const plainTextContent = stripHtml(post.content);
+            // 우리가 새로 만든 함수를 사용하여 완벽한 요약본을 가져옵니다!
+            const description = extractDescription(post.content);
 
             return (
               <Link href={`/${category.toLowerCase()}/${post.id}`} key={post.id} className="list-card">
@@ -52,11 +69,9 @@ export default async function Home() {
                 <div className="list-content">
                   <div className="list-category">{category.toUpperCase()}</div>
                   <h3 className="list-title">{post.title}</h3>
-                  <p className="list-desc">
-                    {plainTextContent.length > 150 ? plainTextContent.substring(0, 150) + '...' : plainTextContent}
-                  </p>
+                  {/* 추출한 description을 그대로 출력합니다 */}
+                  <p className="list-desc">{description}</p>
                   <div className="list-date">
-                    {/* Blogger의 날짜 데이터를 보기 좋게 변환 */}
                     {new Date(post.publishedAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
                   </div>
                 </div>
