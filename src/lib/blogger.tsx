@@ -32,7 +32,7 @@ export async function getPosts(category?: string, maxResults: number = 20): Prom
       // 썸네일 해상도 최적화 (240x160)
       let thumbnail = entry.media$thumbnail?.url || '';
       if (thumbnail) {
-        thumbnail = thumbnail.replace('/s72-c/', '/w240-h160-c/'); 
+        thumbnail = thumbnail.replace('/s72-c/', '/w480-h320-c/'); 
       }
 
       const categories = entry.category ? entry.category.map((cat: any) => cat.term) : [];
