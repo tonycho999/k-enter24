@@ -1,5 +1,7 @@
 // src/lib/blogger.tsx
-const BLOG_URL = process.env.BLOGGER_URL || 'https://본인블로그주소.blogspot.com'; // 🚀 본인 블로그 주소로 변경하세요!
+
+// 환경변수에 설정된 블로그 주소만 사용하도록 수정했습니다.
+const BLOG_URL = process.env.BLOGGER_URL;
 
 export interface BlogPost {
   id: string;
@@ -29,10 +31,10 @@ export async function getPosts(category?: string, maxResults: number = 20): Prom
       const rawId = entry.id.$t;
       const id = rawId.split('post-')[1];
 
-      // 썸네일 해상도 최적화 (240x160)
+      // 🚀 썸네일 해상도 최적화 (어떤 사이즈 파라미터가 오든 w480-h320-c로 강제 치환)
       let thumbnail = entry.media$thumbnail?.url || '';
       if (thumbnail) {
-        thumbnail = thumbnail.replace('/s72-c/', '/w480-h320-c/'); 
+        thumbnail = thumbnail.replace(/\/s\d+(-[w|h|c|p]\d+)*(-[w|h|c|p]\d+)*\/|\/s\d+\/|\/w\d+-h\d+(-[w|h|c|p]\d+)*\//, '/w480-h320-c/'); 
       }
 
       const categories = entry.category ? entry.category.map((cat: any) => cat.term) : [];
@@ -64,10 +66,10 @@ export async function getPostById(id: string): Promise<BlogPost | null> {
     
     if (!entry) return null;
 
-    // 상세페이지용 큰 이미지 최적화
+    // 🚀 상세페이지용 큰 이미지 최적화 (어떤 사이즈 파라미터가 오든 w800-h600-c로 강제 치환)
     let thumbnail = entry.media$thumbnail?.url || '';
     if (thumbnail) {
-      thumbnail = thumbnail.replace('/s72-c/', '/w800-h600-c/'); 
+      thumbnail = thumbnail.replace(/\/s\d+(-[w|h|c|p]\d+)*(-[w|h|c|p]\d+)*\/|\/s\d+\/|\/w\d+-h\d+(-[w|h|c|p]\d+)*\//, '/w800-h600-c/'); 
     }
 
     return {
@@ -100,9 +102,10 @@ export async function searchPosts(keyword: string): Promise<BlogPost[]> {
       const rawId = entry.id.$t;
       const id = rawId.split('post-')[1];
 
+      // 🚀 검색 결과용 썸네일 해상도 최적화 (어떤 사이즈 파라미터가 오든 w480-h320-c로 강제 치환)
       let thumbnail = entry.media$thumbnail?.url || '';
       if (thumbnail) {
-        thumbnail = thumbnail.replace('/s72-c/', '/w240-h160-c/'); 
+        thumbnail = thumbnail.replace(/\/s\d+(-[w|h|c|p]\d+)*(-[w|h|c|p]\d+)*\/|\/s\d+\/|\/w\d+-h\d+(-[w|h|c|p]\d+)*\//, '/w480-h320-c/'); 
       }
 
       const categories = entry.category ? entry.category.map((cat: any) => cat.term) : [];
