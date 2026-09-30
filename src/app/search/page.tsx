@@ -1,18 +1,39 @@
 // src/app/search/page.tsx
 import Link from 'next/link';
-// Prisma 대신 Blogger 검색 함수를 가져옵니다.
-import { searchPosts } from '../../lib/blogger';
+// 절대 경로 적용
+import { searchPosts } from '@/lib/blogger';
 
 export const dynamic = 'force-dynamic'; 
 
 export default async function SearchPage({ searchParams }: { searchParams: { q: string } }) {
   const keyword = searchParams.q || '';
 
-  // Blogger에서 검색어로 글을 가져옵니다. (검색어가 없으면 빈 배열 반환)
+  // Blogger에서 검색어로 글을 가져옵니다.
   const posts = keyword ? await searchPosts(keyword) : [];
 
-  const stripHtml = (html: string) => {
-    return html.replace(/<[^>]*>?/gm, '');
+  // 🚀 Blogger 본문 내의 JSON-LD에서 description 추출
+  const extractDescription = (html: string) => {
+    if (!html) return '';
+
+    try {
+      const scriptMatch = html.match(/<script[^>]*type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/i);
+      if (scriptMatch && scriptMatch[1]) {
+        const jsonData = JSON.parse(scriptMatch[1]);
+        if (jsonData && jsonData.description) {
+          return jsonData.description; 
+        }
+      }
+    } catch (e) {
+      console.error("JSON parsing error in extractDescription", e);
+    }
+
+    // JSON-LD가 없을 때의 방어 코드
+    let text = html.replace(/<(script|style)[^>]*>[\s\S]*?<\/\1>/gi, '');
+    text = text.replace(/<[^>]*>?/gm, '');
+    text = text.replace(/&nbsp;/g, ' ').replace(/&quot;/g, '"').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>');
+    text = text.trim();
+    
+    return text.length > 150 ? text.substring(0, 150) + '...' : text;
   };
 
   return (
@@ -34,7 +55,9 @@ export default async function SearchPage({ searchParams }: { searchParams: { q: 
           {posts.map((post) => {
             const thumbnailUrl = post.thumbnail || 'https://k-enter24.com/og-image.png';
             const category = post.categories && post.categories.length > 0 ? post.categories[0] : 'news';
-            const plainTextContent = stripHtml(post.content);
+            
+            // 새로 만든 함수로 description 추출
+            const description = extractDescription(post.content);
 
             return (
               <Link href={`/${category.toLowerCase()}/${post.id}`} key={post.id} className="list-card">
@@ -44,9 +67,7 @@ export default async function SearchPage({ searchParams }: { searchParams: { q: 
                 <div className="list-content">
                   <div className="list-category">{category.toUpperCase()}</div>
                   <h3 className="list-title">{post.title}</h3>
-                  <p className="list-desc">
-                    {plainTextContent.length > 150 ? plainTextContent.substring(0, 150) + '...' : plainTextContent}
-                  </p>
+                  <p className="list-desc">{description}</p>
                   <div className="list-date">
                     {new Date(post.publishedAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
                   </div>
