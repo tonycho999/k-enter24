@@ -1,6 +1,6 @@
 // src/lib/blogger.tsx
 
-// 환경변수에 설정된 블로그 주소만 사용하도록 수정했습니다.
+// 환경변수에 설정된 블로그 주소만 사용합니다.
 const BLOG_URL = process.env.BLOGGER_URL;
 
 export interface BlogPost {
@@ -12,37 +12,31 @@ export interface BlogPost {
   categories: string[];
 }
 
-// 1. 전체 글 또는 특정 카테고리(라벨) 글 가져오기 (Sitemap, RSS를 위해 maxResults 추가)
+// 1. 전체 글 또는 특정 카테고리(라벨) 글 가져오기
 export async function getPosts(category?: string, maxResults: number = 20): Promise<BlogPost[]> {
   const categoryPath = category ? `/-/${encodeURIComponent(category)}` : '';
   const url = `${BLOG_URL}/feeds/posts/default${categoryPath}?alt=json&max-results=${maxResults}`;
 
   try {
-    // Vercel에서 60초마다 최신화(ISR)하도록 설정
     const res = await fetch(url, { next: { revalidate: 60 } });
     if (!res.ok) throw new Error('Failed to fetch posts');
     const data = await res.json();
 
-    // 글이 없을 경우를 대비한 안전한 접근
     const entries = data.feed?.entry || [];
 
     return entries.map((entry: any) => {
-      // ID 추출
       const rawId = entry.id.$t;
       const id = rawId.split('post-')[1];
 
-      // 🚀 썸네일 해상도 최적화 (어떤 사이즈 파라미터가 오든 w480-h320-c로 강제 치환)
-      let thumbnail = entry.media$thumbnail?.url || '';
-      if (thumbnail) {
-        thumbnail = thumbnail.replace(/\/s\d+(-[w|h|c|p]\d+)*(-[w|h|c|p]\d+)*\/|\/s\d+\/|\/w\d+-h\d+(-[w|h|c|p]\d+)*\//, '/w480-h320-c/'); 
-      }
+      // 🚀 썸네일 변환 없이 원본 URL 그대로 사용
+      const thumbnail = entry.media$thumbnail?.url || '';
 
       const categories = entry.category ? entry.category.map((cat: any) => cat.term) : [];
 
       return {
         id,
         title: entry.title.$t,
-        content: entry.content?.$t || '', // 내용이 비어있는 글 방어코드
+        content: entry.content?.$t || '', 
         publishedAt: entry.published.$t,
         thumbnail,
         categories,
@@ -66,11 +60,8 @@ export async function getPostById(id: string): Promise<BlogPost | null> {
     
     if (!entry) return null;
 
-    // 🚀 상세페이지용 큰 이미지 최적화 (어떤 사이즈 파라미터가 오든 w800-h600-c로 강제 치환)
-    let thumbnail = entry.media$thumbnail?.url || '';
-    if (thumbnail) {
-      thumbnail = thumbnail.replace(/\/s\d+(-[w|h|c|p]\d+)*(-[w|h|c|p]\d+)*\/|\/s\d+\/|\/w\d+-h\d+(-[w|h|c|p]\d+)*\//, '/w800-h600-c/'); 
-    }
+    // 🚀 썸네일 변환 없이 원본 URL 그대로 사용
+    const thumbnail = entry.media$thumbnail?.url || '';
 
     return {
       id,
@@ -91,7 +82,6 @@ export async function searchPosts(keyword: string): Promise<BlogPost[]> {
   const url = `${BLOG_URL}/feeds/posts/default?q=${encodeURIComponent(keyword)}&alt=json&max-results=20`;
 
   try {
-    // 검색 결과는 실시간성이 중요하므로 캐시하지 않음
     const res = await fetch(url, { cache: 'no-store' });
     if (!res.ok) throw new Error('Search API failed');
     
@@ -102,11 +92,8 @@ export async function searchPosts(keyword: string): Promise<BlogPost[]> {
       const rawId = entry.id.$t;
       const id = rawId.split('post-')[1];
 
-      // 🚀 검색 결과용 썸네일 해상도 최적화 (어떤 사이즈 파라미터가 오든 w480-h320-c로 강제 치환)
-      let thumbnail = entry.media$thumbnail?.url || '';
-      if (thumbnail) {
-        thumbnail = thumbnail.replace(/\/s\d+(-[w|h|c|p]\d+)*(-[w|h|c|p]\d+)*\/|\/s\d+\/|\/w\d+-h\d+(-[w|h|c|p]\d+)*\//, '/w480-h320-c/'); 
-      }
+      // 🚀 썸네일 변환 없이 원본 URL 그대로 사용
+      const thumbnail = entry.media$thumbnail?.url || '';
 
       const categories = entry.category ? entry.category.map((cat: any) => cat.term) : [];
 
