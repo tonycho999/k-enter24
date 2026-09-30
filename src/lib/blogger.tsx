@@ -1,6 +1,5 @@
 // src/lib/blogger.tsx
 
-// 환경변수에 설정된 블로그 주소만 사용합니다.
 const BLOG_URL = process.env.BLOGGER_URL;
 
 export interface BlogPost {
@@ -12,7 +11,6 @@ export interface BlogPost {
   categories: string[];
 }
 
-// 1. 전체 글 또는 특정 카테고리(라벨) 글 가져오기
 export async function getPosts(category?: string, maxResults: number = 20): Promise<BlogPost[]> {
   const categoryPath = category ? `/-/${encodeURIComponent(category)}` : '';
   const url = `${BLOG_URL}/feeds/posts/default${categoryPath}?alt=json&max-results=${maxResults}`;
@@ -21,15 +19,21 @@ export async function getPosts(category?: string, maxResults: number = 20): Prom
     const res = await fetch(url, { next: { revalidate: 60 } });
     if (!res.ok) throw new Error('Failed to fetch posts');
     const data = await res.json();
-
     const entries = data.feed?.entry || [];
 
     return entries.map((entry: any) => {
       const rawId = entry.id.$t;
       const id = rawId.split('post-')[1];
 
-      // 🚀 썸네일 변환 없이 원본 URL 그대로 사용
-      const thumbnail = entry.media$thumbnail?.url || '';
+      // 🚀 썸네일 해상도 완벽 해결 로직 (리스트용)
+      let thumbnail = entry.media$thumbnail?.url || '';
+      if (thumbnail) {
+        if (thumbnail.includes('/s72-c/')) {
+          thumbnail = thumbnail.replace('/s72-c/', '/w480-h320-c/'); 
+        } else if (thumbnail.includes('blogger.googleusercontent.com')) {
+          thumbnail = thumbnail.split('=')[0] + '=w480-h320-c';
+        }
+      }
 
       const categories = entry.category ? entry.category.map((cat: any) => cat.term) : [];
 
@@ -48,7 +52,6 @@ export async function getPosts(category?: string, maxResults: number = 20): Prom
   }
 }
 
-// 2. 특정 상세 글 하나만 가져오기
 export async function getPostById(id: string): Promise<BlogPost | null> {
   const url = `${BLOG_URL}/feeds/posts/default/${id}?alt=json`;
 
@@ -60,8 +63,15 @@ export async function getPostById(id: string): Promise<BlogPost | null> {
     
     if (!entry) return null;
 
-    // 🚀 썸네일 변환 없이 원본 URL 그대로 사용
-    const thumbnail = entry.media$thumbnail?.url || '';
+    // 🚀 썸네일 해상도 완벽 해결 로직 (상세 페이지용 더 큰 사이즈)
+    let thumbnail = entry.media$thumbnail?.url || '';
+    if (thumbnail) {
+      if (thumbnail.includes('/s72-c/')) {
+        thumbnail = thumbnail.replace('/s72-c/', '/w800-h600-c/'); 
+      } else if (thumbnail.includes('blogger.googleusercontent.com')) {
+        thumbnail = thumbnail.split('=')[0] + '=w800-h600-c';
+      }
+    }
 
     return {
       id,
@@ -77,14 +87,12 @@ export async function getPostById(id: string): Promise<BlogPost | null> {
   }
 }
 
-// 3. 검색어로 글 찾기
 export async function searchPosts(keyword: string): Promise<BlogPost[]> {
   const url = `${BLOG_URL}/feeds/posts/default?q=${encodeURIComponent(keyword)}&alt=json&max-results=20`;
 
   try {
     const res = await fetch(url, { cache: 'no-store' });
     if (!res.ok) throw new Error('Search API failed');
-    
     const data = await res.json();
     const entries = data.feed?.entry || []; 
 
@@ -92,8 +100,15 @@ export async function searchPosts(keyword: string): Promise<BlogPost[]> {
       const rawId = entry.id.$t;
       const id = rawId.split('post-')[1];
 
-      // 🚀 썸네일 변환 없이 원본 URL 그대로 사용
-      const thumbnail = entry.media$thumbnail?.url || '';
+      // 🚀 썸네일 해상도 완벽 해결 로직 (검색 리스트용)
+      let thumbnail = entry.media$thumbnail?.url || '';
+      if (thumbnail) {
+        if (thumbnail.includes('/s72-c/')) {
+          thumbnail = thumbnail.replace('/s72-c/', '/w480-h320-c/'); 
+        } else if (thumbnail.includes('blogger.googleusercontent.com')) {
+          thumbnail = thumbnail.split('=')[0] + '=w480-h320-c';
+        }
+      }
 
       const categories = entry.category ? entry.category.map((cat: any) => cat.term) : [];
 
