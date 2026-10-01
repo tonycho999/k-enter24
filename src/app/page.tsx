@@ -71,9 +71,15 @@ export default async function Home() {
                   <h3 className="list-title">{post.title}</h3>
                   {/* 추출한 description을 그대로 출력합니다 */}
                   <p className="list-desc">{description}</p>
-                  <div className="list-date">
-                    {new Date(post.publishedAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
-                  </div>
+  <div className="list-date">
+    {/* timeZone: 'Asia/Seoul' 옵션을 추가하여 한국 시간으로 계산하여 표시합니다 */}
+    {new Date(post.publishedAt).toLocaleDateString('en-US', { 
+      timeZone: 'Asia/Seoul', 
+      year: 'numeric', 
+      month: 'long', 
+      day: 'numeric' 
+    })}
+  </div>
                 </div>
               </Link>
             );
