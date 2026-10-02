@@ -5,7 +5,6 @@ import { getPosts } from '@/lib/blogger';
 export async function GET() {
   // Blogger에서 최신글 20개를 가져옵니다. 
   const posts = await getPosts(undefined, 20);
-
   const siteUrl = 'https://k-enter24.com';
 
   // 🚀 Blogger 본문 내의 JSON-LD에서 description 추출
@@ -33,12 +32,30 @@ export async function GET() {
     return text.length > 200 ? text.substring(0, 200) + '...' : text;
   };
 
+  // 🚀 시간을 KST(한국 시간, +0900)로 변환해 주는 함수 추가
+  const getKSTDateString = (dateString: string) => {
+    const date = new Date(dateString);
+    // 원래 시간에 9시간을 더합니다.
+    date.setHours(date.getHours() + 9);
+    
+    const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    
+    const dayName = days[date.getUTCDay()];
+    const day = String(date.getUTCDate()).padStart(2, '0');
+    const month = months[date.getUTCMonth()];
+    const year = date.getUTCFullYear();
+    const hours = String(date.getUTCHours()).padStart(2, '0');
+    const minutes = String(date.getUTCMinutes()).padStart(2, '0');
+    const seconds = String(date.getUTCSeconds()).padStart(2, '0');
+
+    // RSS 2.0 시간 표준(RFC 822)에 맞게 +0900을 강제로 붙여서 완성
+    return `${dayName}, ${day} ${month} ${year} ${hours}:${minutes}:${seconds} +0900`;
+  };
+
   // RSS 2.0 표준 양식 생성
   const rssItemsXml = posts.map(post => {
-    // 카테고리가 비어있을 경우 대비
     const category = post.categories && post.categories.length > 0 ? post.categories[0] : 'news';
-    
-    // 새로 만든 함수로 description 추출 (RSS용)
     const description = extractDescription(post.content);
     
     return `
@@ -47,7 +64,7 @@ export async function GET() {
       <link>${siteUrl}/${category.toLowerCase()}/${post.id}</link>
       <description><![CDATA[${description}]]></description>
       <category>${category}</category>
-      <pubDate>${new Date(post.publishedAt).toUTCString()}</pubDate>
+      <pubDate>${getKSTDateString(post.publishedAt)}</pubDate>
     </item>
   `}).join('');
 
