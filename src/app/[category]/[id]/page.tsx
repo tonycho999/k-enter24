@@ -43,9 +43,15 @@ export default async function PostDetailPage({ params }: { params: { id: string,
         <h1 style={{ fontSize: '2.5rem', fontWeight: '900', lineHeight: '1.2', marginBottom: '15px' }}>
           {post.title}
         </h1>
-        <time style={{ color: '#64748b', fontSize: '0.95rem' }}>
-          {new Date(post.publishedAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
-        </time>
+  <time style={{ color: '#64748b', fontSize: '0.95rem' }}>
+    {new Date(post.publishedAt).toLocaleDateString('en-US', { 
+      timeZone: 'Asia/Seoul', 
+      year: 'numeric', 
+      month: 'long', 
+      day: 'numeric' 
+    })}
+  </time>
+
       </header>
 
       {/* 🚀 본문 영역: Blogger에서 작성한 HTML이 그대로 렌더링 됩니다. */}
