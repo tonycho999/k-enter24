@@ -11,7 +11,7 @@ export interface BlogPost {
   categories: string[];
 }
 
-export async function getPosts(category?: string, maxResults: number = 20): Promise<BlogPost[]> {
+export async function getPosts(category?: string, maxResults: number = 30): Promise<BlogPost[]> {
   const categoryPath = category ? `/-/${encodeURIComponent(category)}` : '';
   const url = `${BLOG_URL}/feeds/posts/default${categoryPath}?alt=json&max-results=${maxResults}`;
 
