@@ -1,5 +1,5 @@
 // src/app/page.tsx
-'use client'; // 필터 버튼 클릭 상태를 관리하기 위해 클라이언트 컴포넌트로 변경
+'use client'; 
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
@@ -9,21 +9,25 @@ export default function Home() {
   const [posts, setPosts] = useState<BlogPost[]>([]);
   const [loading, setLoading] = useState(true);
   
-  // 현재 연도와 월을 기본값으로 설정 (월은 1~12 숫자)
   const currentYear = new Date().getFullYear();
-  const currentMonth = new Date().getMonth() + 1; 
-  
   const [selectedYear, setSelectedYear] = useState<number>(currentYear);
-  const [selectedMonth, setSelectedMonth] = useState<number>(currentMonth);
+  const [selectedMonth, setSelectedMonth] = useState<number | null>(null); // 처음에는 최신 기사가 있는 달로 자동 설정되게 만듦
 
-  // 영어 월 이름 매핑 (버튼 텍스트용)
   const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
   useEffect(() => {
     async function fetchPosts() {
-      // 넉넉하게 100개를 가져와서 클라이언트에서 필터링합니다.
       const data = await getPosts(undefined, 100);
       setPosts(data);
+      
+      // 🚀 데이터가 로드되면, 가장 '최근 기사가 있는 달'을 찾아서 기본 선택 달로 설정합니다.
+      if (data.length > 0) {
+        // 첫 번째 기사(가장 최신 기사)의 달을 찾음
+        const firstPostDate = new Date(data[0].publishedAt);
+        // getMonth()는 0부터 시작하므로 +1 안하고 문자열 매칭용으로 씁니다 (안전한 파싱)
+        const latestMonth = Number(firstPostDate.toLocaleDateString('en-US', { timeZone: 'Asia/Seoul', month: 'numeric' }));
+        setSelectedMonth(latestMonth);
+      }
       setLoading(false);
     }
     fetchPosts();
@@ -46,16 +50,25 @@ export default function Home() {
     return text.length > 150 ? text.substring(0, 150) + '...' : text;
   };
 
-  // 🚀 선택된 연도와 월에 맞는 기사만 걸러내기 (필터링)
-  const filteredPosts = posts.filter(post => {
-    // 기사 발행 시간을 한국 시간(KST)으로 맞춰서 연/월을 뽑아냅니다.
-    const date = new Date(post.publishedAt);
-    date.setHours(date.getHours() + 9); 
-    
-    const postYear = date.getFullYear();
-    const postMonth = date.getMonth() + 1;
+  // 🚀 핵심: 기사에서 한국 시간(KST) 기준의 연/월을 안전하게 추출하는 헬퍼 함수
+  const getPostYearMonth = (dateString: string) => {
+    // toLocaleDateString을 이용해 강제로 한국 시간 기준의 숫자를 뽑아냅니다. (오류 제로)
+    const kstYear = new Date(dateString).toLocaleDateString('en-US', { timeZone: 'Asia/Seoul', year: 'numeric' });
+    const kstMonth = new Date(dateString).toLocaleDateString('en-US', { timeZone: 'Asia/Seoul', month: 'numeric' });
+    return { year: Number(kstYear), month: Number(kstMonth) };
+  };
 
-    return postYear === selectedYear && postMonth === selectedMonth;
+  // 1. 우리가 불러온 모든 기사를 쭉 스캔해서 "기사가 존재하는 달" 목록만 뽑아냅니다. (중복 제거)
+  const availableMonths = Array.from(new Set(
+    posts
+      .filter(post => getPostYearMonth(post.publishedAt).year === selectedYear) // 현재 선택된 연도에 해당하는 글만 대상
+      .map(post => getPostYearMonth(post.publishedAt).month)
+  )).sort((a, b) => b - a); // 최신 달(12월)부터 역순으로 보여주도록 정렬
+
+  // 2. 현재 선택된 연도와 월에 해당하는 기사만 솎아냅니다.
+  const filteredPosts = posts.filter(post => {
+    const postDate = getPostYearMonth(post.publishedAt);
+    return postDate.year === selectedYear && postDate.month === selectedMonth;
   });
 
   return (
@@ -63,45 +76,45 @@ export default function Home() {
       <div className="page-header">
         <h2 className="page-title">🔥 Trending K-Culture</h2>
         
-        {/* 🚀 연도별 & 월별 필터 UI 영역 */}
         <div style={{ marginBottom: '20px' }}>
-          
-          {/* 1. 연도 버튼들 (필요시 2025, 2024 추가 가능) */}
+          {/* 연도 버튼 */}
           <div className="year-filter" style={{ marginBottom: '10px' }}>
             <button 
               className={`year-btn ${selectedYear === currentYear ? 'active' : ''}`}
-              onClick={() => setSelectedYear(currentYear)}
+              onClick={() => {
+                setSelectedYear(currentYear);
+                // 연도를 바꿨을 때 그 연도의 기사가 없으면 에러가 날 수 있으니 방어
+                setSelectedMonth(null); 
+              }}
             >
               {currentYear}
             </button>
-            {/* 예시: 작년 버튼 <button className={`year-btn ${selectedYear === 2025 ? 'active' : ''}`} onClick={() => setSelectedYear(2025)}>2025</button> */}
           </div>
 
-          {/* 2. 월별 버튼들 (가로 스크롤 가능하게 flex로 나열) */}
-          <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '10px', whiteSpace: 'nowrap' }}>
-            {monthNames.map((month, index) => {
-              const monthNumber = index + 1;
-              return (
+          {/* 🚀 기사가 있는 월(Month)만 렌더링하는 버튼 영역 */}
+          {availableMonths.length > 0 && (
+            <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '10px', whiteSpace: 'nowrap' }}>
+              {availableMonths.map((monthNum) => (
                 <button
-                  key={month}
-                  onClick={() => setSelectedMonth(monthNumber)}
+                  key={monthNum}
+                  onClick={() => setSelectedMonth(monthNum)}
                   style={{
                     padding: '6px 12px',
                     borderRadius: '20px',
                     border: '1px solid #cbd5e1',
-                    background: selectedMonth === monthNumber ? '#0f172a' : '#ffffff',
-                    color: selectedMonth === monthNumber ? '#ffffff' : '#475569',
+                    background: selectedMonth === monthNum ? '#0f172a' : '#ffffff',
+                    color: selectedMonth === monthNum ? '#ffffff' : '#475569',
                     cursor: 'pointer',
                     fontSize: '14px',
-                    fontWeight: selectedMonth === monthNumber ? 'bold' : 'normal'
+                    fontWeight: selectedMonth === monthNum ? 'bold' : 'normal'
                   }}
                 >
-                  {month}
+                  {/* monthNames 배열은 0부터 시작하므로 monthNum - 1을 씁니다 */}
+                  {monthNames[monthNum - 1]}
                 </button>
-              );
-            })}
-          </div>
-
+              ))}
+            </div>
+          )}
         </div>
       </div>
       
@@ -111,7 +124,7 @@ export default function Home() {
         </div>
       ) : filteredPosts.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '100px 0', color: '#64748b' }}>
-          <h3>{monthNames[selectedMonth - 1]} {selectedYear}에 등록된 기사가 없습니다.</h3>
+          <h3>기사가 존재하지 않습니다. 다른 탭을 클릭해 보세요.</h3>
         </div>
       ) : (
         <div className="article-list">
