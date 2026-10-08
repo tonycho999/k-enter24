@@ -11,7 +11,17 @@ export async function generateMetadata({ params }: { params: { id: string, categ
     return { title: 'Post Not Found | K-ENTER 24' };
   }
 
-  const plainTextContent = post.content.replace(/<[^>]*>?/gm, '').substring(0, 160);
+  // 1. <style>과 <script> 태그 및 그 내부 텍스트(JSON 코드 등)를 완전히 제거
+  let plainTextContent = post.content.replace(/<(style|script)[^>]*>[\s\S]*?<\/\1>/gi, '');
+  
+  // 2. 나머지 일반 HTML 태그들을 모두 제거 (텍스트만 남김)
+  plainTextContent = plainTextContent.replace(/<[^>]*>?/gm, '');
+  
+  // 3. 줄바꿈, 탭 등 불필요한 공백을 제거하여 한 줄로 깔끔하게 정리
+  plainTextContent = plainTextContent.replace(/\s+/g, ' ').trim();
+  
+  // 4. 구글 및 SNS 설명글 권장 길이에 맞게 160자로 자르기
+  plainTextContent = plainTextContent.substring(0, 160);
 
   return {
     title: `${post.title} | K-ENTER 24`,
@@ -21,6 +31,13 @@ export async function generateMetadata({ params }: { params: { id: string, categ
       description: plainTextContent,
       images: [post.thumbnail || 'https://k-enter24.com/og-image.png'],
     },
+    // 트위터(X) 공유 시 썸네일이 크고 매력적으로 노출되도록 추가
+    twitter: {
+      card: 'summary_large_image',
+      title: post.title,
+      description: plainTextContent,
+      images: [post.thumbnail || 'https://k-enter24.com/og-image.png'],
+    }
   };
 }
 
@@ -43,15 +60,14 @@ export default async function PostDetailPage({ params }: { params: { id: string,
         <h1 style={{ fontSize: '2.5rem', fontWeight: '900', lineHeight: '1.2', marginBottom: '15px' }}>
           {post.title}
         </h1>
-  <time style={{ color: '#64748b', fontSize: '0.95rem' }}>
-    {new Date(post.publishedAt).toLocaleDateString('en-US', { 
-      timeZone: 'Asia/Seoul', 
-      year: 'numeric', 
-      month: 'long', 
-      day: 'numeric' 
-    })}
-  </time>
-
+        <time style={{ color: '#64748b', fontSize: '0.95rem' }}>
+          {new Date(post.publishedAt).toLocaleDateString('en-US', { 
+            timeZone: 'Asia/Seoul', 
+            year: 'numeric', 
+            month: 'long', 
+            day: 'numeric' 
+          })}
+        </time>
       </header>
 
       {/* 🚀 본문 영역: Blogger에서 작성한 HTML이 그대로 렌더링 됩니다. */}
