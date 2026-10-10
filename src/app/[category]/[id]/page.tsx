@@ -1,9 +1,9 @@
 // src/app/[category]/[id]/page.tsx
 import { notFound } from 'next/navigation';
-import { getPostById } from '../../../lib/blogger';
+// 🚀 피드백 반영: 절대 경로 사용
+import { getPostById } from '@/lib/blogger';
 import { Metadata } from 'next';
 
-// 🚀 기사별 동적 SEO 메타데이터 생성 (공유 시 썸네일, 제목 자동 지정)
 export async function generateMetadata({ params }: { params: { id: string, category: string } }): Promise<Metadata> {
   const post = await getPostById(params.id);
   
@@ -11,55 +11,74 @@ export async function generateMetadata({ params }: { params: { id: string, categ
     return { title: 'Post Not Found | K-ENTER 24' };
   }
 
-  // 1. <style>과 <script> 태그 및 그 내부 텍스트(JSON 코드 등)를 완전히 제거
-  let plainTextContent = post.content.replace(/<(style|script)[^>]*>[\s\S]*?<\/\1>/gi, '');
-  
-  // 2. 나머지 일반 HTML 태그들을 모두 제거 (텍스트만 남김)
-  plainTextContent = plainTextContent.replace(/<[^>]*>?/gm, '');
-  
-  // 3. 줄바꿈, 탭 등 불필요한 공백을 제거하여 한 줄로 깔끔하게 정리
-  plainTextContent = plainTextContent.replace(/\s+/g, ' ').trim();
-  
-  // 4. 구글 및 SNS 설명글 권장 길이에 맞게 160자로 자르기
-  plainTextContent = plainTextContent.substring(0, 160);
+  // 🚀 피드백 반영: Description 똑똑하게 추출하기 (JSON-LD 우선, 없으면 텍스트 추출)
+  let description = '';
+  try {
+    const scriptMatch = post.content.match(/<script[^>]*type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/i);
+    if (scriptMatch && scriptMatch[1]) {
+      const jsonData = JSON.parse(scriptMatch[1]);
+      if (jsonData && jsonData.description) {
+        description = jsonData.description; 
+      }
+    }
+  } catch (e) {}
+
+  // JSON에 description이 없었을 경우를 위한 백업 (텍스트 추출 후 155자에서 깔끔하게 ... 처리)
+  if (!description) {
+    let plainText = post.content.replace(/<(style|script)[^>]*>[\s\S]*?<\/\1>/gi, '');
+    plainText = plainText.replace(/<[^>]*>?/gm, '');
+    plainText = plainText.replace(/\s+/g, ' ').trim();
+    description = plainText.length > 155 ? plainText.substring(0, 155) + '...' : plainText;
+  }
+
+  // 🚀 기사의 최종 주소 (Canonical URL용)
+  const postUrl = `https://k-enter24.com/${params.category.toLowerCase()}/${post.id}`;
 
   return {
     title: `${post.title} | K-ENTER 24`,
-    description: plainTextContent,
+    description: description,
+    
+    // 🚀 피드백 1: Canonical URL 추가 (구글에게 이 주소가 진짜 원본이라고 알려줌)
+    alternates: {
+      canonical: postUrl,
+    },
+    
     openGraph: {
       title: post.title,
-      description: plainTextContent,
+      description: description,
       images: [post.thumbnail || 'https://k-enter24.com/og-image.png'],
+      // 🚀 피드백 2: OG 누락 속성 추가
+      url: postUrl,
+      siteName: 'K-ENTER 24',
+      type: 'article',
     },
-    // 트위터(X) 공유 시 썸네일이 크고 매력적으로 노출되도록 추가
     twitter: {
       card: 'summary_large_image',
       title: post.title,
-      description: plainTextContent,
+      description: description,
       images: [post.thumbnail || 'https://k-enter24.com/og-image.png'],
     }
   };
 }
 
 export default async function PostDetailPage({ params }: { params: { id: string, category: string } }) {
-  // 1. Blogger에서 해당 ID의 글 불러오기
   const post = await getPostById(params.id);
 
-  // 글이 없으면 404 Not Found 페이지로 이동
   if (!post) {
     notFound();
   }
 
   return (
     <article className="post-detail-container">
-      {/* 🚀 상단 헤더: 대형 제목, 카테고리, 날짜 */}
       <header className="post-header" style={{ marginBottom: '30px', borderBottom: '2px solid #000', paddingBottom: '20px' }}>
         <div style={{ color: '#ef4444', fontWeight: 'bold', marginBottom: '10px', textTransform: 'uppercase' }}>
           {params.category.replace('-', ' ')}
         </div>
+        
         <h1 style={{ fontSize: '2.5rem', fontWeight: '900', lineHeight: '1.2', marginBottom: '15px' }}>
           {post.title}
         </h1>
+        
         <time style={{ color: '#64748b', fontSize: '0.95rem' }}>
           {new Date(post.publishedAt).toLocaleDateString('en-US', { 
             timeZone: 'Asia/Seoul', 
@@ -70,8 +89,7 @@ export default async function PostDetailPage({ params }: { params: { id: string,
         </time>
       </header>
 
-      {/* 🚀 본문 영역: Blogger에서 작성한 HTML이 그대로 렌더링 됩니다. */}
-      {/* 기획하신 '18px 폰트 및 1.9 줄간격의 가독성 높은 매거진 스타일'을 인라인 스타일로 적용 */}
+      {/* 🚀 본문 영역 */}
       <div 
         className="post-content"
         style={{ 
@@ -82,7 +100,6 @@ export default async function PostDetailPage({ params }: { params: { id: string,
         }}
         dangerouslySetInnerHTML={{ __html: post.content }} 
       />
-      
     </article>
   );
 }
