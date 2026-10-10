@@ -69,9 +69,9 @@ export default function AdTop() {
               }}>
                 ✈️ TRAVEL DEAL
               </span>
-              <h3 style={{ fontSize: '20px', fontWeight: '800', margin: 0, lineHeight: '1.2' }}>
-                Discover the Best of Korea with KKday
-              </h3>
+            <div style={{ fontSize: '20px', fontWeight: '800', margin: 0, lineHeight: '1.2' }}>
+              Discover the Best of Korea with KKday
+            </div>
             </div>
             <p style={{ fontSize: '14px', color: '#e2e8f0', margin: 0, lineHeight: '1.4' }}>
               Exclusive deals on K-Pop tours, hanbok rentals, theme parks, and authentic cultural experiences.
