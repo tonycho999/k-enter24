@@ -12,7 +12,7 @@ export default function AdTop() {
       padding: '0 20px',
       boxSizing: 'border-box'
     }}>
-      <Link href="https://invl.me/clo2vf4" target="_blank" rel="noopener noreferrer" style={{ display: 'block', textDecoration: 'none' }}>
+      <Link href="https://invl.me/clo2vf4" target="_blank" rel="sponsored nofollow noopener noreferrer"  style={{ display: 'block', textDecoration: 'none' }}>
         <div style={{
           position: 'relative',
           borderRadius: '12px', // 모서리 둥글기 살짝 축소
