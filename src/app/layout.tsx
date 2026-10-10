@@ -84,7 +84,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             
             {/* 만약 화면 상단 글씨(K-ENTER 24)도 이미지 로고로 바꾸고 싶다면, 
                 아래 <Link> 안의 글씨를 지우고 <img src="/logo.png" alt="logo" height="40" /> 로 바꾸셔도 됩니다. */}
-            <Link href="/" className="logo">K-ENTER 24</Link>
+            <Link href="/" className="logo"><img src="/logo.png" alt="logo" height="40" /></Link>
             
             {/* 🚀 검색창 부품 장착! */}
             <SearchBar />
