@@ -79,7 +79,10 @@ export default async function PostDetailPage({ params }: { params: { id: string,
           {post.title}
         </h1>
         
-        <time style={{ color: '#64748b', fontSize: '0.95rem' }}>
+        <time 
+          dateTime={new Date(post.publishedAt).toISOString()} // 🚀 피드백 반영: 구글 봇이 읽기 좋은 표준 포맷
+          style={{ color: '#64748b', fontSize: '0.95rem' }}
+        >
           {new Date(post.publishedAt).toLocaleDateString('en-US', { 
             timeZone: 'Asia/Seoul', 
             year: 'numeric', 
