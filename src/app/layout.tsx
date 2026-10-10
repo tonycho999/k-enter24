@@ -2,40 +2,88 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import './globals.css';
-import AdTop from '../components/AdTop';
-import AdLeft from '../components/AdLeft';
-import AdRight from '../components/AdRight';
-import SearchBar from '../components/SearchBar';
-import Footer from '../components/Footer'; 
 
-// 🚀 구글 서치콘솔 소유권 확인 태그 (SEO 핵심)
+// 🚀 절대 경로(@/) 적용 (경로 에러 방지)
+import AdTop from '@/components/AdTop';
+import AdLeft from '@/components/AdLeft';
+import AdRight from '@/components/AdRight';
+import SearchBar from '@/components/SearchBar';
+import Footer from '@/components/Footer'; 
+
 export const metadata: Metadata = {
+  // 🚀 metadataBase 필수 추가: Next.js가 이미지 주소를 절대 경로로 만들 때 필요합니다.
+  metadataBase: new URL('https://k-enter24.com'),
+  
   title: 'K-ENTER 24 | Global K-Culture Blog',
   description: 'Your daily source for K-Pop, K-Drama, and K-Culture.',
+  
   verification: {
     google: 'K7nILRoN2qJRl9Cfvp6tkRkddR_Q9YWz7GSd56MY05Y',
   },
+  
+  // 🚀 방금 만든 og-image.png를 사이트 '기본' 썸네일로 지정 (카톡, 페북 공유용)
+  openGraph: {
+    title: 'K-ENTER 24 | Global K-Culture Blog',
+    description: 'Your daily source for K-Pop, K-Drama, and K-Culture.',
+    url: 'https://k-enter24.com',
+    siteName: 'K-ENTER 24',
+    images: ['/og-image.png'],
+    locale: 'en_US',
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'K-ENTER 24 | Global K-Culture Blog',
+    description: 'Your daily source for K-Pop, K-Drama, and K-Culture.',
+    images: ['/og-image.png'],
+  },
+
   robots: {
-    index: true,     // 구글에 이 페이지를 등록해라
-    follow: true,    // 이 페이지에 있는 링크(기사들)도 다 따라가서 수집해라
+    index: true,     
+    follow: true,    
     googleBot: {
       index: true,
       follow: true,
       'max-video-preview': -1,
-      'max-image-preview': 'large', // 사진을 고화질로 긁어가서 구글 이미지 검색에 크게 띄워라
-      'max-snippet': -1,            // 글 내용도 제한 없이 다 긁어가라
+      'max-image-preview': 'large', 
+      'max-snippet': -1,            
     },
   },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
+  // 🚀 구글 봇에게 우리 웹사이트의 '공식 로고'가 무엇인지 알려주는 구조화 데이터
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    "name": "K-ENTER 24",
+    "url": "https://k-enter24.com",
+    "publisher": {
+      "@type": "Organization",
+      "name": "K-ENTER 24",
+      "logo": {
+        "@type": "ImageObject",
+        "url": "https://k-enter24.com/logo.png" // 방금 만드신 로고 연결!
+      }
+    }
+  };
+
   return (
     <html lang="en">
       <body>
+        {/* 🚀 JSON-LD 스크립트를 화면에 보이지 않게 삽입 */}
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        />
+
         <div className="magazine-layout">
           
           {/* 상단 1: 로고 & 검색바 */}
           <header className="header-top">
+            
+            {/* 만약 화면 상단 글씨(K-ENTER 24)도 이미지 로고로 바꾸고 싶다면, 
+                아래 <Link> 안의 글씨를 지우고 <img src="/logo.png" alt="logo" height="40" /> 로 바꾸셔도 됩니다. */}
             <Link href="/" className="logo">K-ENTER 24</Link>
             
             {/* 🚀 검색창 부품 장착! */}
@@ -43,7 +91,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             
           </header>
 
-          {/* 상단 2: 메인 카테고리 메뉴 (미리 다운로드 기능 prefetch=true 장착) */}
+          {/* 상단 2: 메인 카테고리 메뉴 */}
           <nav className="nav-menu">
             <Link href="/k-pop" prefetch={true} className="nav-link">K-POP</Link>
             <Link href="/k-drama" prefetch={true} className="nav-link">K-DRAMA</Link>
@@ -70,6 +118,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <AdRight />
             
           </div>
+
           <Footer />
         </div>
       </body>
