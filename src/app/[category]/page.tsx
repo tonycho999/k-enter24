@@ -42,7 +42,7 @@ export default async function CategoryPage({ params }: { params: { category: str
     <div>
       <div className="page-header">
         {/* 현재 보고 있는 카테고리 이름을 타이틀로 출력 */}
-        <h2 className="page-title">🔥 {categoryLabel} NEWS</h2>
+        <h2 className="page-title">🧭 {categoryLabel} GUIDE</h2>
       </div>
       
       {posts.length === 0 ? (
