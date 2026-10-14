@@ -74,7 +74,7 @@ export default function AdTop() {
             </div>
             </div>
             <p style={{ fontSize: '14px', color: '#e2e8f0', margin: 0, lineHeight: '1.4' }}>
-              Exclusive deals on K-Pop tours, hanbok rentals, theme parks, and authentic cultural experiences.
+                Tours, attraction tickets, eSIMs, and airport transfers for your Korea trip.
             </p>
           </div>
 
