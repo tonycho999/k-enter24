@@ -74,7 +74,7 @@ export async function GET() {
         파일	수정 전	수정 후
         <title>K-ENTER 24 | Korea Travel & Trend Guide</title>
         <link>${siteUrl}</link>
-        <description>Your daily source for K-Pop, K-Drama, and K-Culture.</description>
+        <description>Your guide to Korea's best attractions, food, shopping, beauty, and local trends.</description>
         <language>en</language>
         <atom:link href="${siteUrl}/rss.xml" rel="self" type="application/rss+xml"/>
         ${rssItemsXml}
