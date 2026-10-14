@@ -12,6 +12,10 @@ import Footer from '@/components/Footer';
 const SITE_TITLE = 'K-ENTER 24 | Korea Travel & Trend Guide';
 const SITE_DESC = "Your guide to Korea's best attractions, food, shopping, beauty, and local trends, written for international travelers.";
 
+// 🖼️ 이미지 정보 (파일을 바꾸면 여기 숫자만 고치면 됩니다)
+const LOGO = { url: 'https://k-enter24.com/logo.png', width: 600, height: 230 };
+const OG_IMAGE = { url: '/og-image.png', width: 1200, height: 630, alt: 'K-ENTER 24 | Korea Travel & Trend Guide' };
+
 export const metadata: Metadata = {
   metadataBase: new URL('https://k-enter24.com'),
   title: SITE_TITLE,
@@ -24,7 +28,7 @@ export const metadata: Metadata = {
     description: SITE_DESC,
     url: 'https://k-enter24.com',
     siteName: 'K-ENTER 24',
-    images: ['/og-image.png'],
+    images: [OG_IMAGE], // 🚀 크기와 alt를 함께 넘겨서 SNS가 더 빨리, 정확하게 표시
     locale: 'en_US',
     type: 'website',
   },
@@ -32,7 +36,7 @@ export const metadata: Metadata = {
     card: 'summary_large_image',
     title: SITE_TITLE,
     description: SITE_DESC,
-    images: ['/og-image.png'],
+    images: [OG_IMAGE.url],
   },
   robots: {
     index: true,
@@ -47,7 +51,6 @@ export const metadata: Metadata = {
   },
 };
 
-// 🚀 메뉴 목록 (라벨을 바꾸고 싶으면 여기만 고치면 됩니다)
 const MENU = [
   { href: '/attractions', label: 'ATTRACTIONS' },
   { href: '/food', label: 'FOOD' },
@@ -67,7 +70,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     publisher: {
       '@type': 'Organization',
       name: 'K-ENTER 24',
-      logo: { '@type': 'ImageObject', url: 'https://k-enter24.com/logo.png' },
+      url: 'https://k-enter24.com',
+      logo: {
+        '@type': 'ImageObject',
+        url: LOGO.url,
+        width: LOGO.width,   // 🚀 로고 실제 크기 명시
+        height: LOGO.height,
+      },
     },
   };
 
@@ -78,7 +87,16 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 
         <div className="magazine-layout">
           <header className="header-top">
-            <Link href="/" className="logo">K-ENTER 24</Link>
+            {/* 🚀 텍스트 로고 → logo.png 이미지 로고 */}
+            <Link href="/" className="logo" aria-label="K-ENTER 24 Home" style={{ display: 'flex', alignItems: 'center' }}>
+              <img
+                src="/logo.png"
+                alt="K-ENTER 24"
+                width={120}   // 600×230 비율 유지 (120×46)
+                height={46}
+                style={{ height: '46px', width: 'auto', display: 'block' }}
+              />
+            </Link>
             <SearchBar />
           </header>
 
