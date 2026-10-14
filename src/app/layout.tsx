@@ -1,8 +1,6 @@
-// src/app/layout.tsx
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import './globals.css';
-
 import AdTop from '@/components/AdTop';
 import AdLeft from '@/components/AdLeft';
 import AdRight from '@/components/AdRight';
@@ -10,11 +8,11 @@ import SearchBar from '@/components/SearchBar';
 import Footer from '@/components/Footer';
 
 const SITE_TITLE = 'K-ENTER 24 | Korea Travel & Trend Guide';
-const SITE_DESC = "Your guide to Korea's best attractions, food, shopping, beauty, and local trends, written for international travelers.";
+const SITE_DESC = "Your guide to Korea's best sights, local food, style, beauty, and travel tips, written for international travelers.";
 
-// 🖼️ 이미지 정보 (파일을 바꾸면 여기 숫자만 고치면 됩니다)
+// 🖼️ 이미지 정보 (og-image 표준 비율인 1200x630으로 수정 반영)
 const LOGO = { url: 'https://k-enter24.com/logo.png', width: 600, height: 230 };
-const OG_IMAGE = { url: '/og-image.png', width: 1200, height: 833, alt: 'K-ENTER 24 | Korea Travel & Trend Guide' };
+const OG_IMAGE = { url: '/og-image.png', width: 1200, height: 630, alt: 'K-ENTER 24 | Korea Travel & Trend Guide' };
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://k-enter24.com'),
@@ -51,12 +49,12 @@ export const metadata: Metadata = {
   },
 };
 
+// 🗺️ 새롭게 정의된 4대 카테고리 메뉴 구조
 const MENU = [
-  { href: '/attractions', label: 'ATTRACTIONS' },
+  { href: '/sights', label: 'SIGHTS' },
   { href: '/food', label: 'FOOD' },
-  { href: '/shopping', label: 'SHOPPING' },
-  { href: '/beauty', label: 'BEAUTY' },
-  { href: '/culture', label: 'CULTURE & TIPS' },
+  { href: '/style', label: 'STYLE' },
+  { href: '/tips', label: 'TIPS' },
 ];
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -84,7 +82,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en">
       <body>
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
-
         <div className="magazine-layout">
           <header className="header-top">
             {/* 🚀 텍스트 로고 → logo.png 이미지 로고 */}
@@ -99,7 +96,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             </Link>
             <SearchBar />
           </header>
-
           <nav className="nav-menu">
             {MENU.map((item) => (
               <Link key={item.href} href={item.href} prefetch={true} className="nav-link">
@@ -107,15 +103,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               </Link>
             ))}
           </nav>
-
           <AdTop />
-
           <div className="content-area-with-ads">
             <AdLeft />
             <main className="main-content">{children}</main>
             <AdRight />
           </div>
-
           <Footer />
         </div>
       </body>
