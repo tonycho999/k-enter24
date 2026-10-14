@@ -7,7 +7,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const baseUrl = 'https://k-enter24.com'; // 실제 도메인으로 변경해 주세요.
 
   // 1. 고정된 기본 메뉴들
-  const staticRoutes = ['', '/k-pop', '/k-drama', '/k-movie', '/k-entertainment', '/k-culture'].map((route) => ({
+const staticRoutes = ['', '/attractions', '/food', '/shopping', '/beauty', '/culture'].map((route) => ({
     url: `${baseUrl}${route}`,
     lastModified: new Date(),
     changeFrequency: 'hourly' as const,
