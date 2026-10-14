@@ -71,7 +71,8 @@ export async function GET() {
   const rssXml = `<?xml version="1.0" encoding="UTF-8"?>
     <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
       <channel>
-        <title>K-ENTER 24 | Global K-Culture Blog</title>
+        파일	수정 전	수정 후
+        <title>K-ENTER 24 | Korea Travel & Trend Guide</title>
         <link>${siteUrl}</link>
         <description>Your daily source for K-Pop, K-Drama, and K-Culture.</description>
         <language>en</language>
