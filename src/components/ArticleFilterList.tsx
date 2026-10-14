@@ -57,7 +57,7 @@ export default function ArticleFilterList({ initialPosts }: { initialPosts: Blog
   return (
     <div>
       <div className="page-header">
-        <h2 className="page-title">🔥 Trending K-Culture</h2>
+        <h2 className="page-title">🧭 Latest Korea Travel Guides</h2>
         
         <div style={{ marginBottom: '20px' }}>
           <div className="year-filter" style={{ marginBottom: '10px' }}>
