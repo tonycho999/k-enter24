@@ -27,7 +27,7 @@ export default function About() {
       <div className="post-body">
         {/* 대표 이미지: public 폴더의 og-image.png 사용 (저작권 걱정 없음) */}
         <div className="post-main-image" style={{ marginBottom: '40px' }}>
-          <img src="/og-image.png" alt="K-ENTER 24 Korea Travel and Trend Guide" width={1200} height={630} />
+          <img src="/og-image.png" alt="K-ENTER 24 Korea Travel and Trend Guide" width={1200} height={833} />
         </div>
 
         <p style={{ fontSize: '22px', fontWeight: 'bold', color: '#1e293b', marginBottom: '32px' }}>
