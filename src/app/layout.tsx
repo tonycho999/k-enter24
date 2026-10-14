@@ -14,7 +14,7 @@ const SITE_DESC = "Your guide to Korea's best attractions, food, shopping, beaut
 
 // 🖼️ 이미지 정보 (파일을 바꾸면 여기 숫자만 고치면 됩니다)
 const LOGO = { url: 'https://k-enter24.com/logo.png', width: 600, height: 230 };
-const OG_IMAGE = { url: '/og-image.png', width: 1200, height: 630, alt: 'K-ENTER 24 | Korea Travel & Trend Guide' };
+const OG_IMAGE = { url: '/og-image.png', width: 1200, height: 833, alt: 'K-ENTER 24 | Korea Travel & Trend Guide' };
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://k-enter24.com'),
