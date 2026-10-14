@@ -1,79 +1,115 @@
 // src/app/privacy/page.tsx
+import type { Metadata } from 'next';
+
+export const metadata: Metadata = {
+  title: 'Privacy Policy | K-ENTER 24',
+  description: 'Learn how K-ENTER 24 collects, uses, and protects your information, including cookies, advertising, and affiliate links.',
+  alternates: { canonical: 'https://k-enter24.com/privacy' },
+};
+
+const h2Style = {
+  fontSize: '24px',
+  fontWeight: '800',
+  color: '#1e293b',
+  marginBottom: '16px',
+  marginTop: '32px',
+} as const;
+
+const linkStyle = { color: '#2563eb', textDecoration: 'underline' } as const;
+
 export default function PrivacyPolicy() {
-  const lastUpdated = "August 10, 2026"; // 현재 날짜로 변경 가능
+  const lastUpdated = 'October 14, 2026';
 
   return (
     <div className="post-detail-container">
       <div className="post-category-label">LEGAL</div>
       <h1 className="post-title">Privacy Policy</h1>
-      
+
       <div className="post-meta">
         <span>Last Updated: {lastUpdated}</span>
       </div>
 
       <div className="post-body">
         <p>
-          Welcome to <strong>K-ENTER 24</strong> ("we," "our," or "us"). We respect your privacy and are committed to protecting your personal data. This Privacy Policy explains how we collect, use, and safeguard your information when you visit our website (https://k-enter24.com).
+          Welcome to <strong>K-ENTER 24</strong> ("we," "our," or "us"), a Korea travel and trend guide for international visitors. This Privacy Policy explains what information is collected when you visit https://k-enter24.com and how it is used.
         </p>
-        <p>
-          Please read this privacy policy carefully. If you do not agree with the terms of this privacy policy, please do not access the site.
-        </p>
+        <p>By using this website, you agree to the practices described in this policy.</p>
 
         <hr style={{ margin: '40px 0', border: 'none', borderTop: '1px solid #e2e8f0' }} />
 
-        <h2 style={{ fontSize: '24px', fontWeight: '800', color: '#1e293b', marginBottom: '16px' }}>
-          1. Information We Collect
-        </h2>
+        <h2 style={{ ...h2Style, marginTop: 0 }}>1. Information We Collect</h2>
         <p>
-          We automatically collect certain information when you visit, use, or navigate our website. This information does not reveal your specific identity (like your name or contact information) but may include device and usage information, such as your IP address, browser and device characteristics, operating system, language preferences, referring URLs, country, location, and information about how and when you use our website.
+          We do not require you to create an account or provide your name to read our guides. When you visit, certain information is collected automatically, such as your IP address, browser type, device type, operating system, language settings, referring pages, approximate location (country or city), and the pages you view.
+        </p>
+        <p>
+          If you contact us by email, we receive your email address and the contents of your message. We use this only to respond to you.
         </p>
 
-        <h2 style={{ fontSize: '24px', fontWeight: '800', color: '#1e293b', marginBottom: '16px', marginTop: '32px' }}>
-          2. Log Files and Analytics
-        </h2>
+        <h2 style={h2Style}>2. Hosting and Server Logs</h2>
         <p>
-          Like many other websites, K-ENTER 24 makes use of log files and analytics tools (such as Google Analytics). The information inside the log files includes internet protocol (IP) addresses, type of browser, Internet Service Provider (ISP), date/time stamp, referring/exit pages, and possibly the number of clicks. This information is used to analyze trends, administer the site, track user's movement around the site, and gather demographic information.
+          Our website is hosted by Vercel. Like most hosting providers, Vercel processes technical log data (such as IP addresses and request times) to deliver the website securely and reliably.
         </p>
 
-        <h2 style={{ fontSize: '24px', fontWeight: '800', color: '#1e293b', marginBottom: '16px', marginTop: '32px' }}>
-          3. Cookies and Web Beacons
-        </h2>
+        <h2 style={h2Style}>3. Cookies</h2>
         <p>
-          We use cookies to store information about visitors' preferences, to record user-specific information on which pages the site visitor accesses or visits, and to personalize or customize our web page content based upon visitors' browser type or other information that the visitor sends via their browser.
+          Cookies are small files stored on your device. We and our partners may use cookies to keep the website working, understand how visitors use our pages, serve advertising, and track bookings made through affiliate links. You can block or delete cookies in your browser settings, but some features may not work properly.
         </p>
 
-        <h2 style={{ fontSize: '24px', fontWeight: '800', color: '#1e293b', marginBottom: '16px', marginTop: '32px' }}>
-          4. Google AdSense & DoubleClick DART Cookie
-        </h2>
+        <h2 style={h2Style}>4. Advertising (Google AdSense)</h2>
         <p>
-          Google, as a third-party vendor, uses cookies to serve ads on K-ENTER 24. Google's use of the DART cookie enables it to serve ads to our site's visitors based upon their visit to our site and other sites on the Internet.
+          We may display ads served by Google and other third-party vendors. These vendors, including Google, use cookies to serve ads based on your previous visits to this website and other websites.
         </p>
         <p>
-          Users may opt-out of the use of the DART cookie by visiting the Google ad and content network privacy policy at the following URL: <br/>
-          <a href="https://policies.google.com/technologies/ads" target="_blank" rel="noopener noreferrer" style={{ color: '#2563eb', textDecoration: 'underline' }}>
-            https://policies.google.com/technologies/ads
-          </a>
+          Google's use of advertising cookies enables it and its partners to serve ads to you based on your visits to our site and other sites on the Internet. You can opt out of personalized advertising by visiting{' '}
+          <a href="https://adssettings.google.com" target="_blank" rel="noopener noreferrer" style={linkStyle}>Google Ads Settings</a>.
+          You can also opt out of some third-party vendors' cookies at{' '}
+          <a href="https://www.aboutads.info/choices" target="_blank" rel="noopener noreferrer" style={linkStyle}>www.aboutads.info</a>.
         </p>
-
-        <h2 style={{ fontSize: '24px', fontWeight: '800', color: '#1e293b', marginBottom: '16px', marginTop: '32px' }}>
-          5. Affiliate Disclosure (Amazon Associates)
-        </h2>
         <p>
-          K-ENTER 24 is a participant in the Amazon Services LLC Associates Program, an affiliate advertising program designed to provide a means for sites to earn advertising fees by advertising and linking to Amazon.com. As an Amazon Associate, we earn from qualifying purchases at no additional cost to you.
+          To learn more, see{' '}
+          <a href="https://policies.google.com/technologies/partner-sites" target="_blank" rel="noopener noreferrer" style={linkStyle}>How Google uses information from sites that use its services</a>.
         </p>
 
-        <h2 style={{ fontSize: '24px', fontWeight: '800', color: '#1e293b', marginBottom: '16px', marginTop: '32px' }}>
-          6. External Links
-        </h2>
+        <h2 style={h2Style}>5. Affiliate Links</h2>
         <p>
-          Our website may contain links to other websites that are not operated by us. If you click on a third-party link, you will be directed to that third party's site. We strongly advise you to review the Privacy Policy of every site you visit. We have no control over and assume no responsibility for the content, privacy policies, or practices of any third-party sites or services.
+          Some links on K-ENTER 24 are affiliate links to travel services such as tours, attraction tickets, and hotels, including KKday. These links are managed through affiliate networks such as Involve Asia.
+        </p>
+        <p>
+          When you click an affiliate link, the partner may place a cookie on your device to record that you came from our website. If you make a booking, we may earn a commission at no extra cost to you. Any booking you make is handled by the partner and is subject to their own privacy policy.
         </p>
 
-        <h2 style={{ fontSize: '24px', fontWeight: '800', color: '#1e293b', marginBottom: '16px', marginTop: '32px' }}>
-          7. Contact Us
-        </h2>
+        <h2 style={h2Style}>6. How We Use Information</h2>
+        <ul style={{ paddingLeft: '24px', lineHeight: '1.8' }}>
+          <li>To operate, maintain, and secure the website</li>
+          <li>To understand which guides are useful and improve our content</li>
+          <li>To display advertising and measure affiliate referrals</li>
+          <li>To respond to messages you send us</li>
+        </ul>
+        <p>We do not sell your personal information.</p>
+
+        <h2 style={h2Style}>7. Your Privacy Rights</h2>
         <p>
-          If you have any questions or suggestions about our Privacy Policy, do not hesitate to contact us at: <strong>contact@k-enter24.com</strong>
+          Depending on where you live, including the European Economic Area, the United Kingdom, and California, you may have the right to access, correct, or delete personal information about you, or to object to certain processing. To make a request, contact us using the email below.
+        </p>
+
+        <h2 style={h2Style}>8. Children's Privacy</h2>
+        <p>
+          Our website is not directed at children under 13, and we do not knowingly collect personal information from children.
+        </p>
+
+        <h2 style={h2Style}>9. External Links</h2>
+        <p>
+          Our guides may link to official tourism sites, maps, booking platforms, and other third-party websites. We are not responsible for the content or privacy practices of those websites.
+        </p>
+
+        <h2 style={h2Style}>10. Changes to This Policy</h2>
+        <p>
+          We may update this Privacy Policy from time to time. Changes will be posted on this page with an updated "Last Updated" date.
+        </p>
+
+        <h2 style={h2Style}>11. Contact Us</h2>
+        <p>
+          If you have questions about this Privacy Policy, contact us at: <strong>contact@k-enter24.com</strong>
         </p>
       </div>
     </div>
