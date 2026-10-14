@@ -1,4 +1,3 @@
-// src/components/ArticleFilterList.tsx
 'use client'; 
 
 import { useState, useEffect } from 'react';
@@ -9,7 +8,6 @@ export default function ArticleFilterList({ initialPosts }: { initialPosts: Blog
   const currentYear = new Date().getFullYear();
   const [selectedYear, setSelectedYear] = useState<number>(currentYear);
   const [selectedMonth, setSelectedMonth] = useState<number | null>(null); 
-
   const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
   const getPostYearMonth = (dateString: string) => {
@@ -35,14 +33,13 @@ export default function ArticleFilterList({ initialPosts }: { initialPosts: Blog
   const extractDescription = (html: string) => {
     if (!html) return '';
     try {
-      const scriptMatch = html.match(/<script[^>]*type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/i);
+      const scriptMatch = html.match(/<script[^>]*type="application\\/ld\\+json"[^>]*>([\\s\\S]*?)<\\/script>/i);
       if (scriptMatch && scriptMatch[1]) {
         const jsonData = JSON.parse(scriptMatch[1]);
         if (jsonData && jsonData.description) return jsonData.description; 
       }
     } catch (e) {}
-
-    let text = html.replace(/<(script|style)[^>]*>[\s\S]*?<\/\1>/gi, '');
+    let text = html.replace(/<(script|style)[^>]*>[\\s\\S]*?<\\/\\1>/gi, '');
     text = text.replace(/<[^>]*>?/gm, '');
     text = text.replace(/&nbsp;/g, ' ').replace(/&quot;/g, '"').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>');
     return text.trim().length > 150 ? text.trim().substring(0, 150) + '...' : text.trim();
@@ -58,7 +55,6 @@ export default function ArticleFilterList({ initialPosts }: { initialPosts: Blog
     <div>
       <div className="page-header">
         <h2 className="page-title">🧭 Latest Korea Travel Guides</h2>
-        
         <div style={{ marginBottom: '20px' }}>
           <div className="year-filter" style={{ marginBottom: '10px' }}>
             <button 
@@ -71,7 +67,6 @@ export default function ArticleFilterList({ initialPosts }: { initialPosts: Blog
               {currentYear}
             </button>
           </div>
-
           {availableMonths.length > 0 && (
             <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '10px', whiteSpace: 'nowrap' }}>
               {availableMonths.map((monthNum) => (
@@ -105,9 +100,9 @@ export default function ArticleFilterList({ initialPosts }: { initialPosts: Blog
         <div className="article-list">
           {filteredPosts.map((post) => {
             const thumbnailUrl = post.thumbnail || 'https://k-enter24.com/og-image.png';
-            const category = post.categories && post.categories.length > 0 ? post.categories[0] : 'news';
+            // 🚀 예전 기본값 'news'를 새로운 기본 카테고리명인 'tips'로 변경
+            const category = post.categories && post.categories.length > 0 ? post.categories[0] : 'tips';
             const description = extractDescription(post.content);
-
             return (
               <Link href={`/${category.toLowerCase()}/${post.id}`} key={post.id} className="list-card">
                 <div className="list-image">
