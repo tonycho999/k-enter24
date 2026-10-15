@@ -25,16 +25,16 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   // 2. 카테고리
   const categoryRoutes: MetadataRoute.Sitemap = CATEGORIES.map((cat) => ({
-    url: \\\`${BASE_URL}/${cat}\\\`,
+    url: `${BASE_URL}/${cat}`,
     lastModified: latestOf(cat),
   }));
 
   // 3. 정보 페이지 (날짜 생략: 자주 바뀌지 않음)
-  const infoRoutes: MetadataRoute.Sitemap = INFO_PAGES.map((path) => ({ url: \\\`${BASE_URL}${path}\\\` }));
+  const infoRoutes: MetadataRoute.Sitemap = INFO_PAGES.map((path) => ({ url: `${BASE_URL}${path}` }));
 
   // 4. 기사
   const articleRoutes: MetadataRoute.Sitemap = articles.map((a) => ({
-    url: \\\`${BASE_URL}/${a.category}/${a.id}\\\`,
+    url: `${BASE_URL}/${a.category}/${a.id}`,
     lastModified: a.date,
   }));
 
