@@ -1,12 +1,10 @@
-// src/components/Footer.tsx
 import Link from 'next/link';
 
 const CATEGORIES = [
-  { href: '/attractions', label: 'Attractions' },
+  { href: '/sights', label: 'Sights' },
   { href: '/food', label: 'Food' },
-  { href: '/shopping', label: 'Shopping' },
-  { href: '/beauty', label: 'Beauty' },
-  { href: '/culture', label: 'Culture & Tips' },
+  { href: '/style', label: 'Style' },
+  { href: '/tips', label: 'Tips' },
 ];
 
 const POLICIES = [
@@ -32,7 +30,6 @@ export default function Footer() {
       }}
     >
       <div style={{ maxWidth: '1200px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-
         {/* 사이트 소개 */}
         <div>
           <div style={{ fontWeight: 800, color: '#0f172a', fontSize: '16px' }}>K-ENTER 24</div>
